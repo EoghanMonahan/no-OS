@@ -795,4 +795,21 @@ int ad74416h_init(struct ad74416h_desc **, struct ad74416h_init_param *);
 /** Free the device descriptor */
 int ad74416h_remove(struct ad74416h_desc *desc);
 
+
+void HART_Configure(struct ad74416h_desc *);
+
+void HART_enableRTS(struct ad74416h_desc *);
+void HART_disableRTS(struct ad74416h_desc *);
+void HART_WriteTxData(struct ad74416h_desc *, uint8_t* hart_data_tx, uint8_t totallen);
+void HART_ReadRxData(struct ad74416h_desc *, uint8_t* hart_data_rx, uint8_t totallen); 
+uint8_t HART_TxFIFO_ByteCount(struct ad74416h_desc *);
+uint8_t HART_RxFIFO_ByteCount(struct ad74416h_desc *);
+
+void HART_SendHartfame(struct ad74416h_desc *, uint8_t* hart_data_tx, uint8_t totallen);
+void HART_ReadHartFrame(struct ad74416h_desc *, uint8_t* hart_data_tx);
+
+void HART_Read_Single_byte_config(struct ad74416h_desc *);
+uint8_t HART_Read_Single_byte(struct ad74416h_desc *, uint8_t* hart_data_rx);
+
+
 #endif // _AD74416H_H

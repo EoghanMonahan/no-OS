@@ -1020,3 +1020,144 @@ int ad74416h_remove(struct ad74416h_desc *desc)
 
 	return 0;
 }
+
+void HART_Configure(struct ad74416h_desc *desc)
+{
+    
+    ad74416h_reg_write(desc, AD74416H_CH_FUNC_SETUP(0), 0x0000);          
+    ad74416h_reg_write(desc, AD74416H_CH_FUNC_SETUP(0), 0x000C);          //Iin Loop powered with HART Mode
+
+    ad74416h_reg_write(desc, AD74416H_OUTPUT_CONFIG(0), 0x0140);
+    
+    ad74416h_reg_write(desc, AD74416H_ADC_CONV_CTRL, 0x0000);
+    ad74416h_reg_write(desc, AD74416H_ADC_CONV_CTRL, 0x2001);
+      
+    ad74416h_reg_write(desc, AD74416H_HART_ALERT_MASK(0), 0x0000);
+
+    ad74416h_reg_write(desc, AD74416H_HART_CONFIG(0), 0xD431);
+
+}
+
+
+
+
+void HART_enableRTS(struct ad74416h_desc *desc)
+{
+    
+    ad74416h_reg_write(desc, AD74416H_HART_MCR(0),0x0001);
+    
+}
+
+
+void HART_disableRTS(struct ad74416h_desc *desc)
+{
+  
+    ad74416h_reg_write(desc, AD74416H_HART_MCR(0),0x0000);
+       
+}
+
+void HART_WriteTxData(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_t totallen)
+{
+       
+       for(int i=0;i< totallen;i++)
+       {
+              ad74416h_reg_write(desc, AD74416H_HART_TX(0),hart_data_tx[i]);
+       }
+       
+    
+}
+void HART_ReadRxData(struct ad74416h_desc *desc, uint16_t* hart_data_rx, uint8_t totallen)
+{
+
+    for(int i=0; i< totallen; i++)
+        {
+            ad74416h_reg_read(desc, AD74416H_HART_RX(0), &hart_data_rx[i]); 
+              
+        }
+} 
+
+
+uint8_t HART_TxFIFO_ByteCount(struct ad74416h_desc *desc)
+{
+    uint8_t totallen;
+    ad74416h_reg_read(AD74416H_HART_TFC, totallen);
+    return totallen;
+}
+
+uint8_t HART_RxFIFO_ByteCount(struct ad74416h_desc *desc)
+{
+    uint8_t totallen;
+    ad74416h_reg_read(AD74416H_HART_RFC, totallen); 
+    return totallen;
+}
+
+void HART_SendHartfame(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_t totallen)
+{
+    if (totallen <= 32)
+    {
+        HART_WriteTxData(hart_data_tx, totallen);
+        HART_enableRTS();
+    }
+    else
+    {   
+        HART_WriteTxData(hart_data_tx, 32);
+        HART_enableRTS();
+
+    }
+
+}
+
+void HART_ReadHartFrame(struct ad74416h_desc *desc, uint16_t* hart_data_rx)
+{
+    uint8_t recv_len=0;
+    recv_len = HART_RxFIFO_ByteCount();
+    HART_ReadRxData(desc, hart_data_rx, recv_len);
+}
+
+
+void HART_Read_Single_byte_config(struct ad74416h_desc *desc)
+{
+
+    ad74416h_reg_write(AD74416H_ALERT_MASK, 0x7FFF);  
+    ad74416h_reg_write(AD74416H_CH_FUNC_SETUP, 0x0000);          
+    ad74416h_reg_write(AD74416H_CH_FUNC_SETUP, 0x000C);          //Iin Loop powered with HART Mode
+
+    ad74416h_reg_write(AD74416H_OUTPUT_CONFIG, 0x0140);
+      
+    ad74416h_reg_write(AD74416H_HART_ALERT_MASK, 0xFFE7);
+   
+    ad74416h_reg_write(AD74416H_HART_FCR, 0x0007);             //Clear tX and Rx Fifo
+    ad74416h_reg_write(AD74416H_HART_FCR, 0x0009);
+   
+    ad74416h_reg_write(AD74416H_HART_CONFIG, 0xF031);          //enable hart modem
+    
+    Wait_us(1000);
+    ad74416h_reg_write(AD74416H_HART_FCR, 0x000F);
+
+    ad74416h_reg_write(AD74416H_ALERT_STATUS, 0xFFFF);
+    ad74416h_reg_write(AD74416H_HART_ALERT_STATUS, 0xFFFF);
+
+}
+
+
+uint8_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t* hart_data_rx)
+{
+    if(HART_ALERTb_Status()==0)
+    { 
+        if (HART_RxFIFO_ByteCount()==1)
+        {
+            HART_ReadRxData(hart_data_rx, 1);
+            return 1;
+        }
+        else 
+        {
+            return HART_RxFIFO_ByteCount();
+        }
+    }
+    else
+    {
+        return 0;
+    }  
+
+}
+
