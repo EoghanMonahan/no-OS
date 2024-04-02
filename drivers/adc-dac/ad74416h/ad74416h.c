@@ -1068,7 +1068,7 @@ void HART_WriteTxData(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_t
 }
 void HART_ReadRxData(struct ad74416h_desc *desc, uint16_t* hart_data_rx, uint8_t totallen)
 {
-
+	uint8_t totallen;
     for(int i=0; i< totallen; i++)
         {
             ad74416h_reg_read(desc, AD74416H_HART_RX(0), &hart_data_rx[i]); 
