@@ -1105,11 +1105,11 @@ void HART_SendHartfame(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_
 
 }
 
-void HART_ReadHartFrame(struct ad74416h_desc *desc, uint8_t *hart_data_tx)
+void HART_ReadHartFrame(struct ad74416h_desc *desc, uint8_t *hart_data_rx)
 {
 	uint8_t recv_len=0;
     recv_len = HART_RxFIFO_ByteCount(desc);
-    HART_ReadRxData(desc, *hart_data_rx, *recv_len);
+    HART_ReadRxData(desc, *hart_data_rx, recv_len);
 }
 
 
