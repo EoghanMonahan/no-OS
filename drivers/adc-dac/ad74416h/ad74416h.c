@@ -1066,15 +1066,14 @@ void HART_WriteTxData(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_t
        
     
 }
-void HART_ReadRxData(struct ad74416h_desc *desc, uint16_t* hart_data_rx, uint8_t *totallen)
+void HART_ReadRxData(ad74416h_desc *desc, uint8_t *hart_data_rx, uint8_t totallen)
 {
-    for(int i=0; i< totallen; i++)
+	for(int i=0; i< totallen; i++)
         {
             ad74416h_reg_read(desc, AD74416H_HART_RX(0), hart_data_rx[i]); 
               
         }
 } 
-
 
 uint8_t HART_TxFIFO_ByteCount(struct ad74416h_desc *desc)
 {
@@ -1106,9 +1105,9 @@ void HART_SendHartfame(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_
 
 }
 
-void HART_ReadHartFrame(struct ad74416h_desc *desc, uint16_t* hart_data_rx)
+void HART_ReadHartFrame(ad74416h_desc *, uint8_t *hart_data_tx)
 {
-    uint8_t recv_len=0;
+	uint8_t recv_len=0;
     recv_len = HART_RxFIFO_ByteCount(desc);
     HART_ReadRxData(desc, *hart_data_rx, *recv_len);
 }
@@ -1138,8 +1137,7 @@ void HART_Read_Single_byte_config(struct ad74416h_desc *desc)
 
 }
 
-
-uint8_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t* hart_data_rx)
+uint8_t HART_Read_Single_byte(ad74416h_desc *, uint8_t *hart_data_rx)
 {
     if(HART_ALERTb_Status()==0)
     { 
@@ -1157,6 +1155,5 @@ uint8_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t* hart_data_rx
     {
         return 0;
     }  
-
 }
 
