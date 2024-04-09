@@ -1089,7 +1089,7 @@ uint8_t HART_RxFIFO_ByteCount(struct ad74416h_desc *desc)
     return totallen;
 }
 
-void HART_SendHartfame(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_t totallen)
+void HART_SendHartfame(struct ad74416h_desc *desc, uint16_t* hart_data_tx, uint8_t totallen)
 {
     if (totallen <= 32)
     {
@@ -1105,7 +1105,7 @@ void HART_SendHartfame(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_
 
 }
 
-void HART_ReadHartFrame(struct ad74416h_desc *desc, uint8_t *hart_data_rx)
+void HART_ReadHartFrame(struct ad74416h_desc *desc, uint16_t *hart_data_rx)
 {
 	uint8_t recv_len=0;
     recv_len = HART_RxFIFO_ByteCount(desc);
