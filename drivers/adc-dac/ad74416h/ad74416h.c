@@ -1078,14 +1078,14 @@ void HART_ReadRxData(struct ad74416h_desc *desc, uint16_t *hart_data_rx, uint16_
 uint8_t HART_TxFIFO_ByteCount(struct ad74416h_desc *desc)
 {
     uint16_t totallen=0;
-    ad74416h_reg_read(desc, AD74416H_HART_TFC(0), *totallen);
+    ad74416h_reg_read(desc, AD74416H_HART_TFC(0), &totallen);
     return totallen;
 }
 
 uint8_t HART_RxFIFO_ByteCount(struct ad74416h_desc *desc)
 {
     uint16_t totallen=0;
-    ad74416h_reg_read(desc, AD74416H_HART_RFC(0), *totallen); 
+    ad74416h_reg_read(desc, AD74416H_HART_RFC(0), &totallen); 
     return totallen;
 }
 
@@ -1093,12 +1093,12 @@ void HART_SendHartfame(struct ad74416h_desc *desc, uint8_t* hart_data_tx, uint8_
 {
     if (totallen <= 32)
     {
-        HART_WriteTxData(desc, &hart_data_tx, totallen);
+        HART_WriteTxData(desc, *hart_data_tx, totallen);
         HART_enableRTS(desc);
     }
     else
     {   
-        HART_WriteTxData(desc, &hart_data_tx, 32);
+        HART_WriteTxData(desc, *hart_data_tx, 32);
         HART_enableRTS(desc);
 
     }
@@ -1137,13 +1137,13 @@ void HART_Read_Single_byte_config(struct ad74416h_desc *desc)
 
 }
 
-uint8_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint8_t *hart_data_rx)
+uint16_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t *hart_data_rx)
 {
     if(HART_ALERTb_Status()==0)
     { 
         if (HART_RxFIFO_ByteCount(desc)==1)
         {
-            HART_ReadRxData(desc, hart_data_rx, 1);
+            HART_ReadRxData(desc, *hart_data_rx, 1);
             return 1;
         }
         else 

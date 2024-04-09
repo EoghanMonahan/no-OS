@@ -809,7 +809,7 @@ void HART_SendHartfame(struct ad74416h_desc *, uint8_t* hart_data_tx, uint8_t to
 void HART_ReadHartFrame(struct ad74416h_desc *, uint8_t* hart_data_tx);
 
 void HART_Read_Single_byte_config(struct ad74416h_desc *);
-uint8_t HART_Read_Single_byte(struct ad74416h_desc *, uint8_t* hart_data_rx);
+uint16_t HART_Read_Single_byte(struct ad74416h_desc *, uint16_t* hart_data_rx);
 
 
 #endif // _AD74416H_H
