@@ -1143,7 +1143,7 @@ uint16_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t *hart_data_r
     { 
         if (HART_RxFIFO_ByteCount(desc)==1)
         {
-            HART_ReadRxData(desc, *hart_data_rx, 1);
+            HART_ReadRxData(desc, hart_data_rx, 1);
             return 1;
         }
         else 
