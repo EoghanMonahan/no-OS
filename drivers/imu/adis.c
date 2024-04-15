@@ -42,6 +42,7 @@
 /******************************************************************************/
 
 #include "adis.h"
+#include "adis_internals.h"
 #include "no_os_delay.h"
 #include "no_os_gpio.h"
 #include "no_os_util.h"
@@ -62,12 +63,12 @@
 #define ADIS_1_BYTE_SIZE		1
 #define ADIS_16_BIT_BURST_SIZE		0
 #define ADIS_32_BIT_BURST_SIZE		1
+#define ADIS_FIFO_NOT_PRESENT		0
+#define ADIS_FIFO_PRESENT		1
 #define ADIS_MSG_SIZE_16_BIT_BURST 	20 /* in bytes */
 #define ADIS_MSG_SIZE_32_BIT_BURST 	32 /* in bytes */
 #define ADIS_CHECKSUM_SIZE		2  /* in bytes */
-#define ADIS_READ_BURST_DATA_CMD_SIZE	2  /* in bytes */
-#define ADIS_READ_BURST_DATA_CMD_MSB	0x68
-#define ADIS_READ_BURST_DATA_CMD_LSB	0x00
+#define ADIS_CHECKSUM_BUF_IDX		0
 #define ADIS_SIGN_BIT_POS		15
 #define ADIS_DIAG_IDX_16_BIT_BURST	0
 #define ADIS_XGYRO_IDX_16_BIT_BURST	2
@@ -89,44 +90,38 @@
 #define ADIS_CNT_IDX_32_BIT_BURST	28
 
 /******************************************************************************/
-/************************** Variable Definitions ******************************/
-/******************************************************************************/
-
-static const uint8_t burst_size_bytes[] = {
-	[ADIS_16_BIT_BURST_SIZE] = ADIS_MSG_SIZE_16_BIT_BURST,
-	[ADIS_32_BIT_BURST_SIZE] = ADIS_MSG_SIZE_32_BIT_BURST,
-};
-
-/******************************************************************************/
 /************************ Functions Definitions *******************************/
 /******************************************************************************/
 
 /**
  * @brief Initialize adis device.
  * @param adis - The adis device.
- * @param info - Initialization data.
+ * @param ip   - User specific initialization.
  * @return 0 in case of success, error code otherwise.
  */
-int adis_init(struct adis_dev **adis, const struct adis_chip_info *info)
+int adis_init(struct adis_dev **adis, const struct adis_init_param *ip)
 {
 	struct adis_dev *dev;
 	int ret;
+
+	if (!ip || !ip->info)
+		return -EINVAL;
 
 	dev = (struct adis_dev *)no_os_calloc(1, sizeof(*dev));
 	if (!dev)
 		return -ENOMEM;
 
-	ret = no_os_spi_init(&dev->spi_desc, info->ip->spi_init);
+	ret = no_os_spi_init(&dev->spi_desc, ip->spi_init);
 	if (ret)
 		goto error_spi;
 
-	if(info->has_paging)
+	if(ip->info->has_paging)
 		dev->current_page = -1;
 	else
 		dev->current_page = 0;
 
-	dev->dev_id = info->ip->dev_id;
-	ret = no_os_gpio_get_optional(&dev->gpio_reset, info->ip->gpio_reset);
+	dev->dev_id = ip->dev_id;
+	ret = no_os_gpio_get_optional(&dev->gpio_reset, ip->gpio_reset);
 	if (ret) {
 		pr_warning("No reset pin found \n");
 	}
@@ -138,15 +133,14 @@ int adis_init(struct adis_dev **adis, const struct adis_chip_info *info)
 			goto error;
 	}
 
-	dev->info = info;
-	dev->int_clk = info->int_clk;
+	dev->info = ip->info;
+	dev->int_clk = ip->info->int_clk;
 
 	ret = adis_initial_startup(dev);
 	if (ret)
 		goto error;
 
-	ret = adis_write_sync_mode(dev, info->ip->sync_mode,
-				   info->ip->ext_clk);
+	ret = adis_write_sync_mode(dev, ip->sync_mode, ip->ext_clk);
 	if (ret)
 		goto error;
 
@@ -174,7 +168,6 @@ void adis_remove(struct adis_dev *adis)
 		no_os_spi_remove(adis->spi_desc);
 
 	no_os_free(adis);
-	adis = NULL;
 }
 
 /**
@@ -221,6 +214,10 @@ int adis_initial_startup(struct adis_dev *adis)
 int adis_read_reg(struct adis_dev *adis,  uint32_t reg, uint32_t *val,
 		  uint32_t size)
 {
+	/* If custom implementation is available, use it. */
+	if (adis->info->read_reg)
+		return adis->info->read_reg(adis, reg, val, size);
+
 	int ret;
 	uint32_t page = reg / ADIS_PAGE_SIZE;
 	struct no_os_spi_msg msgs[] = {
@@ -247,6 +244,7 @@ int adis_read_reg(struct adis_dev *adis,  uint32_t reg, uint32_t *val,
 			.cs_delay_last = adis->info->read_delay,
 		},
 		{
+			.tx_buff = adis->tx,
 			.rx_buff = adis->rx + 2,
 			.bytes_number = 2,
 			.cs_change = 1,
@@ -310,6 +308,10 @@ int adis_read_reg(struct adis_dev *adis,  uint32_t reg, uint32_t *val,
 int adis_write_reg(struct adis_dev *adis, uint32_t reg, uint32_t val,
 		   uint32_t size)
 {
+	/* If custom implementation is available, use it. */
+	if (adis->info->write_reg)
+		return adis->info->write_reg(adis, reg, val, size);
+
 	int ret;
 	uint32_t page = reg / ADIS_PAGE_SIZE, i;
 	struct no_os_spi_msg msgs[] = {
@@ -337,6 +339,8 @@ int adis_write_reg(struct adis_dev *adis, uint32_t reg, uint32_t val,
 		{
 			.tx_buff = adis->tx + 6,
 			.bytes_number = 2,
+			.cs_change = 1,
+			.cs_change_delay = adis->info->cs_change_delay,
 			.cs_delay_last = adis->info->write_delay,
 		},
 		{
@@ -395,7 +399,7 @@ int adis_write_reg(struct adis_dev *adis, uint32_t reg, uint32_t val,
  * @param field_val - The read field value.
  * @return 0 in case of success, error code otherwise.
  */
-static int adis_read_field_u32(struct adis_dev *adis, struct adis_field field,
+STATIC int adis_read_field_u32(struct adis_dev *adis, struct adis_field field,
 			       uint32_t *field_val)
 {
 	int ret;
@@ -416,7 +420,7 @@ static int adis_read_field_u32(struct adis_dev *adis, struct adis_field field,
  * @param field_val - The read field value.
  * @return 0 in case of success, error code otherwise.
  */
-static int adis_read_field_s32(struct adis_dev *adis, struct adis_field field,
+STATIC int adis_read_field_s32(struct adis_dev *adis, struct adis_field field,
 			       int32_t *field_val)
 {
 	int ret;
@@ -440,7 +444,7 @@ static int adis_read_field_s32(struct adis_dev *adis, struct adis_field field,
  * @param field_val - The field value to be written.
  * @return 0 in case of success, error code otherwise.
  */
-static int adis_write_field_u32(struct adis_dev *adis, struct adis_field field,
+STATIC int adis_write_field_u32(struct adis_dev *adis, struct adis_field field,
 				uint32_t field_val)
 {
 	if (field_val > no_os_field_get(field.field_mask, field.field_mask))
@@ -478,14 +482,15 @@ int adis_update_bits_base(struct adis_dev *adis, uint32_t reg,
  * @brief Check if the checksum for burst data is correct.
  * @param buffer - The received burst data buffer.
  * @param size   - The size of the buffer.
+ * @param idx    - The start index in the buffer to check the checksum.
  * @return 0 in case of success, error code otherwise.
  */
-static bool adis_validate_checksum(uint8_t *buffer, uint8_t size)
+bool adis_validate_checksum(uint8_t *buffer, uint8_t size, uint8_t idx)
 {
 	uint8_t i;
 	uint16_t checksum = no_os_get_unaligned_be16(&buffer[size-ADIS_CHECKSUM_SIZE]);
 
-	for (i = 0; i < size - ADIS_CHECKSUM_SIZE; i++)
+	for (i = idx; i < size - ADIS_CHECKSUM_SIZE; i++)
 		checksum -= buffer[i];
 
 	return checksum == 0;
@@ -496,7 +501,7 @@ static bool adis_validate_checksum(uint8_t *buffer, uint8_t size)
  * @param adis      - The adis device.
  * @param diag_stat - Diagnosis flags.
  */
-static void adis_update_diag_flags(struct adis_dev *adis, uint16_t diag_stat)
+void adis_update_diag_flags(struct adis_dev *adis, uint16_t diag_stat)
 {
 	const struct adis_data_field_map_def *field_map = adis->info->field_map;
 
@@ -962,6 +967,14 @@ void adis_read_diag_fls_mem_wr_cnt_exceed(struct adis_dev *adis,
  */
 int adis_read_x_gyro(struct adis_dev *adis, int32_t *x_gyro)
 {
+	int ret;
+
+	if (adis->fifo_enabled) {
+		ret = adis_write_fifo_en(adis, 0);
+		if (ret)
+			return ret;
+	}
+
 	return adis_read_field_s32(adis, adis->info->field_map->x_gyro, x_gyro);
 }
 
@@ -973,6 +986,14 @@ int adis_read_x_gyro(struct adis_dev *adis, int32_t *x_gyro)
  */
 int adis_read_y_gyro(struct adis_dev *adis, int32_t *y_gyro)
 {
+	int ret;
+
+	if (adis->fifo_enabled) {
+		ret = adis_write_fifo_en(adis, 0);
+		if (ret)
+			return ret;
+	}
+
 	return adis_read_field_s32(adis, adis->info->field_map->y_gyro, y_gyro);
 }
 
@@ -984,6 +1005,14 @@ int adis_read_y_gyro(struct adis_dev *adis, int32_t *y_gyro)
  */
 int adis_read_z_gyro(struct adis_dev *adis, int32_t *z_gyro)
 {
+	int ret;
+
+	if (adis->fifo_enabled) {
+		ret = adis_write_fifo_en(adis, 0);
+		if (ret)
+			return ret;
+	}
+
 	return adis_read_field_s32(adis, adis->info->field_map->z_gyro, z_gyro);
 }
 
@@ -1759,7 +1788,15 @@ int adis_write_linear_accl_comp(struct adis_dev *adis,
  */
 int adis_read_burst_sel(struct adis_dev *adis, uint32_t *burst_sel)
 {
-	return adis_read_field_u32(adis, adis->info->field_map->burst_sel, burst_sel);
+	int ret;
+
+	ret = adis_read_field_u32(adis, adis->info->field_map->burst_sel, burst_sel);
+	if (ret)
+		return ret;
+
+	adis->burst_sel = *burst_sel;
+
+	return 0;
 }
 
 /**
@@ -1776,6 +1813,8 @@ int adis_write_burst_sel(struct adis_dev *adis, uint32_t burst_sel)
 	if (ret)
 		return ret;
 
+	adis->burst_sel = burst_sel;
+
 	no_os_udelay(adis->info->timeouts->msc_reg_update_us);
 
 	return 0;
@@ -1789,7 +1828,15 @@ int adis_write_burst_sel(struct adis_dev *adis, uint32_t burst_sel)
  */
 int adis_read_burst32(struct adis_dev *adis, uint32_t *burst32)
 {
-	return adis_read_field_u32(adis, adis->info->field_map->burst32, burst32);
+	int ret;
+
+	ret = adis_read_field_u32(adis, adis->info->field_map->burst32, burst32);
+	if (ret)
+		return ret;
+
+	adis->burst32 = (*burst32 == 1);
+
+	return 0;
 }
 
 /**
@@ -1805,6 +1852,8 @@ int adis_write_burst32(struct adis_dev *adis, uint32_t burst32)
 	ret = adis_write_field_u32(adis, adis->info->field_map->burst32, burst32);
 	if (ret)
 		return ret;
+
+	adis->burst32 = (burst32 == 1);
 
 	no_os_udelay(adis->info->timeouts->msc_reg_update_us);
 
@@ -2406,24 +2455,67 @@ int adis_read_fls_mem_wr_cntr(struct adis_dev *adis, uint32_t *fls_mem_wr_cntr)
 
 /**
  * @brief Read burst data.
- * @param adis                 - The adis device.
- * @param burst_data           - Array filled with read data.
- * @param burst_data_size      - Size of burst_data.
- * @param burst_size_selection - Burst size selection encoded value.
+ * @param adis      - The adis device.
+ * @param buff_size - Size of buff, if burst32 is true size must be
+ *		      higher or equal to 30, if burst32 is false size
+ *		      must be higher or equal to 18
+ * @param buff      - Array filled with read data.
+ * @param burst32   - True if 32-bit data is requested for accel
+ *		      and gyro (or delta angle and delta velocity)
+ *		      measurements, false if 16-bit data is requested.
+ * @param burst_sel - 0 if accel and gyro data is requested, 1
+ *		      if delta angle and delta velocity is requested.
+ * @param fifo_pop  - In case FIFO is present, will pop the fifo if
+ * 		      true. Unused if FIFO is not present.
  * @return 0 in case of success, error code otherwise.
  */
-int adis_read_burst_data(struct adis_dev *adis, uint8_t burst_data_size,
-			 uint16_t *burst_data, uint8_t burst_size_selection)
+int adis_read_burst_data(struct adis_dev *adis, uint8_t buff_size,
+			 uint16_t *buff, bool burst32, uint8_t burst_sel,
+			 bool fifo_pop)
 {
+	/* If custom implementation is available, use it. */
+	if (adis->info->read_burst_data)
+		return adis->info->read_burst_data(adis, buff_size, buff, burst32, burst_sel,
+						   fifo_pop);
 	int ret;
-	uint8_t msg_size;
+	uint8_t msg_size, idx;
 
-	msg_size = burst_size_bytes[burst_size_selection];
+	/* Device does not support delta data readings with burst method */
+	if (!(adis->info->flags & ADIS_HAS_BURST_DELTA_DATA) && burst_sel)
+		return -EINVAL;
 
-	if (burst_data_size > (msg_size - ADIS_CHECKSUM_SIZE))
-		burst_data_size = msg_size - ADIS_CHECKSUM_SIZE;
+	/* Device does not support burst32 readings with burst method */
+	if (!(adis->info->flags & ADIS_HAS_BURST32) && burst32)
+		return -EINVAL;
+
+	/* Make sure enough size is allocated if burst32 is true */
+	/* burst 32 data:  1 * 2 (diag) + 6 * 4 + 1 * 2 (temp) + 1 * 2 (counter) = 30 */
+	if (burst32 && buff_size < 30)
+		return -EINVAL;
+
+	/* Make sure enough size is allocated if burst32 is false */
+	/* burst 32 data:  1 * 2 (diag) + 6 * 2 + 1 * 2 (temp) + 1 * 2 (counter) = 18 */
+	if (!burst32 && buff_size < 18)
+		return -EINVAL;
+
+	if (adis->info->flags & ADIS_HAS_BURST32) {
+		if (adis->burst32 != burst32) {
+			ret = adis_write_burst32(adis, burst32);
+			if (ret)
+				return ret;
+		}
+		if (adis->burst_sel != burst_sel) {
+			ret = adis_write_burst_sel(adis, burst_sel);
+			if (ret)
+				return ret;
+		}
+		msg_size = ADIS_MSG_SIZE_16_BIT_BURST;
+	} else {
+		msg_size = ADIS_MSG_SIZE_32_BIT_BURST;
+	}
 
 	uint8_t buffer[msg_size + ADIS_READ_BURST_DATA_CMD_SIZE];
+
 	buffer[0] = ADIS_READ_BURST_DATA_CMD_MSB;
 	buffer[1] = ADIS_READ_BURST_DATA_CMD_LSB;
 
@@ -2432,25 +2524,36 @@ int adis_read_burst_data(struct adis_dev *adis, uint8_t burst_data_size,
 	if (ret)
 		return ret;
 
-	if (adis->info->burst_request) {
-		/* Delay between consecutive reads */
-		no_os_udelay(adis->info->read_delay + adis->info->cs_change_delay);
-
-		ret = no_os_spi_write_and_read(adis->spi_desc, buffer,
-					       msg_size + ADIS_READ_BURST_DATA_CMD_SIZE);
-		if (ret)
-			return ret;
-	}
-
-	if(!adis_validate_checksum(&buffer[ADIS_READ_BURST_DATA_CMD_SIZE], msg_size)) {
+	if (!adis_validate_checksum(&buffer[ADIS_READ_BURST_DATA_CMD_SIZE], msg_size,
+				    ADIS_CHECKSUM_BUF_IDX)) {
 		adis->diag_flags.checksum_err = true;
 		return -EINVAL;
 	}
 
 	adis->diag_flags.checksum_err = false;
 
-	/* Copy read data to buffer, based on burst_data_size value */
-	memcpy(burst_data, &buffer[ADIS_READ_BURST_DATA_CMD_SIZE], burst_data_size);
+	if (burst32 && !(adis->info->flags & ADIS_HAS_BURST32)) {
+		/* burst32 requested, but device does not support burst32 readings,
+		thus reading directly from registers */
+		uint32_t reg_val;
+		/* Diag data */
+		buff[0] = buffer[ADIS_READ_BURST_DATA_CMD_SIZE];
+
+		for (idx = 0; idx < 6; idx++) {
+			buff[idx * 2] = buffer[idx + ADIS_READ_BURST_DATA_CMD_SIZE + 1];
+			ret = adis_read_reg(adis, adis->info->field_map->x_gyro.reg_addr + idx * 4,
+					    &reg_val, 2);
+			if (ret)
+				return ret;
+			buff[idx * 2 + 1] = reg_val;
+		}
+		/* Temp data */
+		buff[13] = buffer[7];
+		/* Counter data */
+		buff[14] = buffer[8];
+	} else {
+		memcpy(buff, &buffer[ADIS_READ_BURST_DATA_CMD_SIZE], buff_size);
+	}
 
 	/* Update diagnosis flags at each reading */
 	adis_update_diag_flags(adis, buffer[ADIS_READ_BURST_DATA_CMD_SIZE]);
@@ -2506,4 +2609,84 @@ int adis_get_sync_clk_freq(struct adis_dev *adis, uint32_t *clk_freq)
 		*clk_freq = adis->ext_clk;
 
 	return 0;
+}
+
+/**
+ * @brief Read adis device gyroscope scale in fractional form.
+ * @param adis       - The adis device.
+ * @param anglvel_scale - The gyroscope scale.
+ * @return 0 in case of success, error code otherwise.
+ */
+int adis_get_anglvel_scale(struct adis_dev *adis,
+			   struct adis_scale_fractional *anglvel_scale)
+{
+	if (!adis || !anglvel_scale)
+		return -EINVAL;
+
+	return adis->info->get_scale(adis, &anglvel_scale->dividend,
+				     &anglvel_scale->divisor, ADIS_GYRO_CHAN);
+}
+
+/**
+ * @brief Read adis device acceleration scale in fractional form.
+ * @param adis       - The adis device.
+ * @param accl_scale - The acceleration scale.
+ * @return 0 in case of success, error code otherwise.
+ */
+int adis_get_accl_scale(struct adis_dev *adis,
+			struct adis_scale_fractional *accl_scale)
+{
+	if (!adis || !accl_scale)
+		return -EINVAL;
+
+	return adis->info->get_scale(adis, &accl_scale->dividend, &accl_scale->divisor,
+				     ADIS_ACCL_CHAN);
+}
+
+/**
+ * @brief Read adis device delta angle scale in fractional form.
+ * @param adis      - The adis device.
+ * @param deltaangl_scale - The delta angle scale.
+ * @return 0 in case of success, error code otherwise.
+ */
+int adis_get_deltaangl_scale(struct adis_dev *adis,
+			     struct adis_scale_fractional_log2 *deltaangl_scale)
+{
+	if (!adis || !deltaangl_scale)
+		return -EINVAL;
+
+	return adis->info->get_scale(adis, &deltaangl_scale->dividend,
+				     &deltaangl_scale->power, ADIS_DELTAANGL_CHAN);
+}
+
+/**
+ * @brief Read adis device delta velocity scale in fractional form.
+ * @param adis      - The adis device.
+ * @param deltavelocity_scale - The delta velocity scale.
+ * @return 0 in case of success, error code otherwise.
+ */
+int adis_get_deltavelocity_scale(struct adis_dev *adis,
+				 struct adis_scale_fractional_log2 *deltavelocity_scale)
+{
+	if (!adis || !deltavelocity_scale)
+		return -EINVAL;
+
+	return adis->info->get_scale(adis, &deltavelocity_scale->dividend,
+				     &deltavelocity_scale->power, ADIS_DELTAVEL_CHAN);
+}
+
+/**
+ * @brief Read adis device temperature scale in fractional form.
+ * @param adis       - The adis device.
+ * @param temp_scale - The temperature scale.
+ * @return 0 in case of success, error code otherwise.
+ */
+int adis_get_temp_scale(struct adis_dev *adis,
+			struct adis_scale_fractional *temp_scale)
+{
+	if (!adis || !temp_scale)
+		return -EINVAL;
+
+	return adis->info->get_scale(adis, &temp_scale->dividend, &temp_scale->divisor,
+				     ADIS_TEMP_CHAN);
 }

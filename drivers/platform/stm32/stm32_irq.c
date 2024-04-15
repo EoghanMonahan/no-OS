@@ -71,6 +71,7 @@ static struct event_list _events[] = {
 	[NO_OS_EVT_UART_ERROR] = {.event = NO_OS_EVT_UART_ERROR, .hal_event = HAL_UART_ERROR_CB_ID},
 #ifdef HAL_TIM_MODULE_ENABLED
 	[NO_OS_EVT_TIM_ELAPSED] = {.event = NO_OS_EVT_TIM_ELAPSED, .hal_event = HAL_TIM_PERIOD_ELAPSED_CB_ID},
+	[NO_OS_EVT_TIM_PWM_PULSE_FINISHED] = {.event = NO_OS_EVT_TIM_PWM_PULSE_FINISHED, .hal_event = HAL_TIM_PWM_PULSE_FINISHED_CB_ID},
 #endif
 #ifdef HAL_DMA_MODULE_ENABLED
 	[NO_OS_EVT_DMA_RX_COMPLETE] = {.event = NO_OS_EVT_DMA_RX_COMPLETE, .hal_event = HAL_DMA_XFER_CPLT_CB_ID},
@@ -88,6 +89,22 @@ static int32_t irq_action_cmp(void *data1, void *data2)
 void HAL_TIM_PeriodElapsedCallback (TIM_HandleTypeDef *htim)
 {
 	struct event_list *ee = &_events[NO_OS_EVT_TIM_ELAPSED];
+	struct irq_action *a;
+	struct irq_action key = {.handle = htim};
+	int ret;
+
+	/* Find & call callback */
+	ret = no_os_list_read_find(ee->actions, (void **)&a, &key);
+	if (ret < 0)
+		return;
+
+	if(a->callback)
+		a->callback(a->ctx);
+}
+
+void HAL_TIM_PWM_PulseFinishedCallback (TIM_HandleTypeDef *htim)
+{
+	struct event_list *ee = &_events[NO_OS_EVT_TIM_PWM_PULSE_FINISHED];
 	struct irq_action *a;
 	struct irq_action key = {.handle = htim};
 	int ret;
@@ -134,6 +151,23 @@ static inline void _common_sai_dma_callback(SAI_HandleTypeDef *hsai,
 }
 #endif
 
+#ifdef HAL_DMA_MODULE_ENABLED
+static inline void _common_tim_dma_callback(DMA_HandleTypeDef *hdma,
+		uint32_t no_os_event)
+{
+	struct event_list *ue = &_events[no_os_event];
+	struct irq_action *a;
+	struct irq_action key = {.handle = hdma};
+	int ret;
+	ret = no_os_list_read_find(ue->actions, (void **)&a, &key);
+	if (ret < 0)
+		return;
+
+	if(a->callback)
+		a->callback(a->ctx);
+}
+#endif
+
 // equivalent of HAL_UART_TxCpltCallback
 void _TxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -155,6 +189,18 @@ void _SAIRxCpltCallback(SAI_HandleTypeDef *hsai)
 void _SAI_RxHalfCpltCallback(SAI_HandleTypeDef *hsai)
 {
 	_common_sai_dma_callback(hsai, NO_OS_EVT_DMA_RX_HALF_COMPLETE);
+}
+#endif
+
+#ifdef HAL_TIM_MODULE_ENABLED && HAL_DMA_MODULE_ENABLED
+void _TIM_DMA_CpltCallback(DMA_HandleTypeDef *hdma)
+{
+	_common_tim_dma_callback(hdma, NO_OS_EVT_DMA_RX_COMPLETE);
+}
+
+void _TIM_DMA_HalfCpltCallback(DMA_HandleTypeDef *hdma)
+{
+	_common_tim_dma_callback(hdma, NO_OS_EVT_DMA_RX_HALF_COMPLETE);
 }
 #endif
 
@@ -244,6 +290,9 @@ int32_t stm32_irq_register_callback(struct no_os_irq_ctrl_desc *desc,
 #ifdef HAL_TIM_MODULE_ENABLED
 	pTIM_CallbackTypeDef pTimCallback;
 	struct irq_action action_key = {.handle = cb->handle};
+#ifdef HAL_DMA_MODULE_ENABLED
+	DMA_HandleTypeDef pDmaCallback;
+#endif
 #endif
 	struct irq_action *li;
 	uint32_t hal_event = _events[cb->event].hal_event;
@@ -293,6 +342,9 @@ int32_t stm32_irq_register_callback(struct no_os_irq_ctrl_desc *desc,
 #ifdef HAL_TIM_MODULE_ENABLED
 	case NO_OS_TIM_IRQ:
 		switch(hal_event) {
+		case HAL_TIM_PWM_PULSE_FINISHED_CB_ID:
+			pTimCallback = HAL_TIM_PWM_PulseFinishedCallback;
+			break;
 		case HAL_TIM_PERIOD_ELAPSED_CB_ID:
 			pTimCallback = HAL_TIM_PeriodElapsedCallback;
 			break;
@@ -340,7 +392,7 @@ int32_t stm32_irq_register_callback(struct no_os_irq_ctrl_desc *desc,
 		break;
 #endif
 #if defined(HAL_DMA_MODULE_ENABLED) && defined(HAL_SAI_MODULE_ENABLED)
-	case NO_OS_DMA_IRQ:
+	case NO_OS_TDM_DMA_IRQ:
 		switch(hal_event) {
 		case HAL_DMA_XFER_CPLT_CB_ID:
 			pSaiDmaCallback = _SAIRxCpltCallback;
@@ -394,6 +446,53 @@ int32_t stm32_irq_register_callback(struct no_os_irq_ctrl_desc *desc,
 		}
 		break;
 #endif
+#if defined (HAL_TIM_MODULE_ENABLED) && defined(HAL_DMA_MODULE_ENABLED)
+	case NO_OS_TIM_DMA_IRQ:
+		switch(hal_event) {
+		case HAL_DMA_XFER_CPLT_CB_ID:
+			pDmaCallback.XferCpltCallback = _TIM_DMA_CpltCallback;
+			ret = HAL_DMA_RegisterCallback(cb->handle, hal_event,
+						       pDmaCallback.XferCpltCallback);
+			if (ret != HAL_OK) {
+				ret = -EFAULT;
+				break;
+			}
+			break;
+		case HAL_DMA_XFER_HALFCPLT_CB_ID:
+			pDmaCallback.XferHalfCpltCallback = _TIM_DMA_HalfCpltCallback;
+			ret = HAL_DMA_RegisterCallback(cb->handle, hal_event,
+						       pDmaCallback.XferCpltCallback);
+			if (ret != HAL_OK) {
+				ret = -EFAULT;
+				break;
+			}
+			break;
+		default:
+			return -EINVAL;
+		};
+
+		if (_events[cb->event].actions == NULL) {
+			ret = no_os_list_init(&_events[cb->event].actions, NO_OS_LIST_PRIORITY_LIST,
+					      irq_action_cmp);
+			if (ret < 0)
+				return ret;
+		}
+
+		li = no_os_calloc(1, sizeof(struct irq_action));
+		if(!li)
+			return -ENOMEM;
+
+		li->handle = cb->handle;
+		li->callback = cb->callback;
+		li->ctx = cb->ctx;
+		ret = no_os_list_add_last(_events[cb->event].actions, li);
+		if (ret < 0) {
+			no_os_free(li);
+			return ret;
+		}
+		break;
+#endif
+
 	default:
 		ret = -EINVAL;
 		break;
@@ -439,12 +538,23 @@ int32_t stm32_irq_unregister_callback(struct no_os_irq_ctrl_desc *desc,
 		break;
 #endif
 #if defined(HAL_DMA_MODULE_ENABLED) && defined(HAL_SAI_MODULE_ENABLED)
-	case NO_OS_DMA_IRQ:
+	case NO_OS_TDM_DMA_IRQ:
 		key.handle = cb->handle;
 		ret = no_os_list_get_find(_events[cb->event].actions, &discard, &key);
 		if (ret < 0)
 			break;
 		ret = HAL_SAI_UnRegisterCallback(cb->handle, hal_event);
+		if (ret != HAL_OK)
+			ret = -EFAULT;
+		break;
+#endif
+#if defined (HAL_TIM_MODULE_ENABLED) && defined(HAL_DMA_MODULE_ENABLED)
+	case NO_OS_TIM_DMA_IRQ:
+		key.handle = cb->handle;
+		ret = no_os_list_get_find(_events[cb->event].actions, &discard, &key);
+		if (ret < 0)
+			break;
+		ret = HAL_DMA_UnRegisterCallback(cb->handle, hal_event);
 		if (ret != HAL_OK)
 			ret = -EFAULT;
 		break;

@@ -261,6 +261,28 @@ int ad4858_set_config_interface_mode(struct ad4858_dev *dev)
 }
 
 /**
+ * @brief Set device data interface mode.
+ * @param dev - Pointer to the device structure.
+ * @return 0 in case of success, negative error code otherwise.
+ */
+int ad4858_set_data_interface_mode(struct ad4858_dev *dev)
+{
+	int ret;
+
+	if (!dev)
+		return -EINVAL;
+
+	/* Set SPI data mode to single instruction mode*/
+	ret = ad4858_set_spi_data_mode(dev, AD4858_SINGLE_INSTRUCTION_MODE);
+	if (ret)
+		return ret;
+
+	/* Disable SDO line to get 3-wire SPI config interface mode */
+	return ad4858_reg_mask(dev, AD4858_REG_INTERFACE_CONFIG_A,
+			       AD4858_SDO_ENABLE_MSK, 0);
+}
+
+/**
  * @brief Enable OSR.
  * @param dev - Pointer to the device structure.
  * @param osr_status - OSR enable/disable status.
@@ -360,6 +382,67 @@ int ad4858_enable_test_pattern(struct ad4858_dev *dev, bool test_pattern)
 	dev->test_pattern = test_pattern;
 
 	return 0;
+}
+/**
+ * @brief Enable/Disable channel sleep.
+ * @param dev - Pointer to the device structure.
+ * @param chn - Input channel.
+ * @param sleep_status - Sleep status.
+ * @return 0 in case of success, negative error code otherwise.
+ */
+int ad4858_enable_ch_sleep(struct ad4858_dev* dev, uint8_t chn,
+			   enum ad4858_ch_sleep_value sleep_status)
+{
+	int ret;
+	uint32_t mask;
+	uint32_t val;
+	uint32_t data;
+
+	if (!dev || (chn >= AD4858_NUM_CHANNELS))
+		return -EINVAL;
+
+	ret = ad4858_reg_read(dev, AD4858_REG_CH_SLEEP, &data);
+	if (ret)
+		return ret;
+
+	dev->chn_sleep_value[chn] = sleep_status;
+	mask = 1 << chn;
+	val = no_os_field_prep(mask, sleep_status);
+	data &= ~mask;
+	data |= val;
+
+	return ad4858_reg_write(dev, AD4858_REG_CH_SLEEP, data);
+}
+
+/**
+ * @brief Enable/Disable seamless hdr.
+ * @param dev - Pointer to the device structure.
+ * @param chn - Input channel.
+ * @param seamless_hdr_status - seamless hdr status.
+ * @return 0 in case of success, negative error code otherwise.
+ */
+int ad4858_enable_ch_seamless_hdr(struct ad4858_dev* dev, uint8_t chn,
+				  enum ad4858_ch_seamless_hdr seamless_hdr_status)
+{
+	int ret;
+	uint32_t val;
+	uint32_t mask;
+	uint32_t data;
+
+	if (!dev || (chn >= AD4858_NUM_CHANNELS))
+		return -EINVAL;
+
+	ret = ad4858_reg_read(dev, AD4858_REG_SEAMLESS_HDR, &data);
+	if (ret)
+		return ret;
+
+	dev->chn_seamless_hdr[chn] = seamless_hdr_status;
+	mask = 1 << chn;
+	val = no_os_field_prep(mask, seamless_hdr_status);
+	data &= ~mask;
+	data |= val;
+
+	return ad4858_reg_write(dev, AD4858_REG_SEAMLESS_HDR, data);
 }
 
 /**
@@ -628,9 +711,9 @@ int ad4858_spi_data_read(struct ad4858_dev *dev, struct ad4858_conv_data *data)
 		/* 20-bit conversion result + 1-bit OR/UR + 3-bit channel ID */
 		for (chn = 0; chn < AD4858_NUM_CHANNELS; chn++) {
 			indx = chn * 3;
-			data->raw[chn] = ((uint32_t)buff[indx] << 16) |
-					 ((uint32_t)buff[indx + 1] << 8) |
-					 (buff[indx + 2] >> 4);
+			data->raw[chn] = (((uint32_t)buff[indx] << 16) |
+					  ((uint32_t)buff[indx + 1] << 8) |
+					  (buff[indx + 2])) >> 4;
 			data->or_ur_status[chn] = (buff[indx + 2] >> 3) & 0x1;
 			data->chn_id[chn] = buff[indx + 2] & 0x7;
 		}
@@ -788,6 +871,24 @@ static int ad4858_config(struct ad4858_dev *dev,
 		ret = ad4858_set_chn_ur_limit(dev, chn_cnt, temp);
 		if (ret)
 			return ret;
+
+		if (init_param->use_default_chn_configs)
+			temp = AD4858_SLEEP_DISABLE;
+		else
+			temp = init_param->chn_sleep_value[chn_cnt];
+
+		ret = ad4858_enable_ch_sleep(dev, chn_cnt, temp);
+		if (ret)
+			return ret;
+
+		if (init_param->use_default_chn_configs)
+			temp = AD4858_SEAMLESS_HDR_ENABLE;
+		else
+			temp = init_param->chn_seamless_hdr[chn_cnt];
+
+		ret = ad4858_enable_ch_seamless_hdr(dev, chn_cnt, temp);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -892,8 +993,8 @@ int ad4858_init(struct ad4858_dev **device,
 {
 	struct ad4858_dev *dev;
 	int32_t ret;
-	uint32_t product_id_l;
-	uint32_t product_id_h;
+	uint32_t product_id_l = 0;
+	uint32_t product_id_h = 0;
 
 	if (!device || !init_param)
 		return -EINVAL;

@@ -50,8 +50,6 @@
 #include "tmr.h"
 #include "maxim_irq.h"
 #include "max32670.h"
-#include "no_os_irq.h"
-#include "no_os_list.h"
 #include "no_os_uart.h"
 #include "no_os_util.h"
 #include "no_os_alloc.h"
@@ -280,9 +278,10 @@ int max_irq_ctrl_remove(struct no_os_irq_ctrl_desc *desc)
 		return -EINVAL;
 
 	for (i = 0; i < NO_OS_ARRAY_SIZE(_events); i++) {
-		while (0 == no_os_list_read_first(_events[i].actions, &discard))
+		while (0 == no_os_list_get_first(_events[i].actions, &discard))
 			no_os_free(discard);
 		no_os_list_remove(_events[i].actions);
+		_events[i].actions = NULL;
 	}
 	no_os_free(desc);
 
@@ -387,7 +386,7 @@ int max_irq_register_callback(struct no_os_irq_ctrl_desc *desc,
 			return -EBUSY;
 		break;
 	case NO_OS_TIM_IRQ:
-		if (_events[NO_OS_EVT_RTC].actions == NULL) {
+		if (_events[NO_OS_EVT_TIM_ELAPSED].actions == NULL) {
 			ret = no_os_list_init(&_events[NO_OS_EVT_TIM_ELAPSED].actions,
 					      NO_OS_LIST_PRIORITY_LIST,
 					      irq_action_cmp);
@@ -395,8 +394,13 @@ int max_irq_register_callback(struct no_os_irq_ctrl_desc *desc,
 				return ret;
 		}
 
-		ret = no_os_list_read_first(_events[NO_OS_EVT_TIM_ELAPSED].actions,
-					    (void **)&action);
+		ret = no_os_list_read_find(_events[callback_desc->event].actions,
+					   (void **)&action,
+					   &action_key);
+		/*
+		 * If an action with the same irq_id as the function parameter does not exists, insert a new one,
+		 * otherwise update
+		 */
 		if (ret) {
 			action = no_os_calloc(1, sizeof(*action));
 			if (!action)
@@ -407,7 +411,7 @@ int max_irq_register_callback(struct no_os_irq_ctrl_desc *desc,
 			action->callback = callback_desc->callback;
 			action->ctx = callback_desc->ctx;
 
-			ret = no_os_list_add_first(_events[NO_OS_EVT_TIM_ELAPSED].actions, action);
+			ret = no_os_list_add_last(_events[callback_desc->event].actions, action);
 			if (ret)
 				goto free_action;
 

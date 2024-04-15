@@ -41,15 +41,21 @@
 /***************************** Include Files **********************************/
 /******************************************************************************/
 
-#include "iio_adis.h"
+#include "iio_adis_internals.h"
+#include "no_os_delay.h"
 #include "no_os_units.h"
 #include <stdio.h>
 #include <string.h>
 #include "adis.h"
+#include "adis_internals.h"
+#include "iio_trigger.h"
 
 /******************************************************************************/
 /********************** Macros and Constants Definitions **********************/
 /******************************************************************************/
+
+#define ADIS_BURST_DATA_SEL_0_CHN_MASK	NO_OS_GENMASK(5, 0)
+#define ADIS_BURST_DATA_SEL_1_CHN_MASK	NO_OS_GENMASK(12, 7)
 
 static const uint32_t adis_3db_freqs[] = {
 	720, /* Filter disabled, full BW (~720Hz) */
@@ -68,6 +74,32 @@ static const uint32_t adis_3db_freqs[] = {
 /******************************************************************************/
 /************************ Functions Definitions *******************************/
 /******************************************************************************/
+
+/**
+ * @brief Wrapper for reading adis register.
+ * @param device  - The iio device structure.
+ * @param reg	  - Address of the register to be read from.
+ * @param readval - Read data.
+ * @return ret    - Result of the reading procedure.
+ */
+int adis_iio_read_reg(struct adis_iio_dev *device, uint32_t reg,
+		      uint32_t *readval)
+{
+	return adis_read_reg(device->adis_dev, reg, readval, 2);
+}
+
+/**
+ * @brief Wrapper for writing to adis register.
+ * @param device   - The iio device structure.
+ * @param reg	    - Address of the register to be written to.
+ * @param writeval - Data to be written.
+ * @return ret     - Result of the writing procedure.
+ */
+int adis_iio_write_reg(struct adis_iio_dev *device, uint32_t reg,
+		       uint32_t writeval)
+{
+	return adis_write_reg(device->adis_dev, reg, writeval, 2);
+}
 
 /**
  * @brief Handles the read request for raw attribute.
@@ -96,7 +128,7 @@ static int adis_iio_read_raw(void *dev, char *buf, uint32_t len,
 
 	adis = iio_adis->adis_dev;
 
-	switch(channel->ch_num) {
+	switch(channel->address) {
 	case ADIS_GYRO_X:
 		ret = adis_read_x_gyro(adis, &res);
 		break;
@@ -160,6 +192,10 @@ static int adis_iio_read_scale(void *dev, char *buf, uint32_t len,
 {
 	uint32_t vals[2];
 	struct adis_iio_dev *iio_adis;
+	struct adis_dev *adis;
+	struct adis_scale_fractional scale_frac;
+	struct adis_scale_fractional_log2 scale_frac_log2;
+	int ret;
 
 	if (!dev)
 		return -EINVAL;
@@ -169,27 +205,43 @@ static int adis_iio_read_scale(void *dev, char *buf, uint32_t len,
 	if (!iio_adis->adis_dev)
 		return -EINVAL;
 
+	adis = iio_adis->adis_dev;
+
 	switch (channel->type) {
 	case IIO_ANGL_VEL:
-		vals[0] = iio_adis->gyro_scale.dividend;
-		vals[1] = iio_adis->gyro_scale.divisor;
+		ret = adis_get_anglvel_scale(adis, &scale_frac);
+		if (ret)
+			return ret;
+		vals[0] = scale_frac.dividend;
+		vals[1] = scale_frac.divisor;
 		return iio_format_value(buf, len, IIO_VAL_FRACTIONAL, 2, (int32_t*)vals);
 	case IIO_ACCEL:
-		vals[0] = iio_adis->accl_scale.dividend;
-		vals[1] = iio_adis->accl_scale.divisor;
+		ret = adis_get_accl_scale(adis, &scale_frac);
+		if (ret)
+			return ret;
+		vals[0] = scale_frac.dividend;
+		vals[1] = scale_frac.divisor;
 		return iio_format_value(buf, len, IIO_VAL_FRACTIONAL, 2, (int32_t*)vals);
-	case IIO_ROT:
-		vals[0] = iio_adis->rot_scale.dividend;
-		vals[1] = iio_adis->rot_scale.power;
+	case IIO_DELTA_ANGL:
+		ret = adis_get_deltaangl_scale(adis, &scale_frac_log2);
+		if (ret)
+			return ret;
+		vals[0] = scale_frac_log2.dividend;
+		vals[1] = scale_frac_log2.power;
 		return iio_format_value(buf, len, IIO_VAL_FRACTIONAL_LOG2, 2, (int32_t*)vals);
-	case IIO_VELOCITY:
-		vals[0] = iio_adis->vel_scale.dividend;
-		vals[1] = iio_adis->vel_scale.power;
+	case IIO_DELTA_VELOCITY:
+		ret = adis_get_deltavelocity_scale(adis, &scale_frac_log2);
+		if (ret)
+			return ret;
+		vals[0] = scale_frac_log2.dividend;
+		vals[1] = scale_frac_log2.power;
 		return iio_format_value(buf, len, IIO_VAL_FRACTIONAL_LOG2, 2, (int32_t*)vals);
 	case IIO_TEMP:
-		vals[0] = iio_adis->temp_scale.dividend;
-		vals[1] = iio_adis->temp_scale.divisor;
-		return iio_format_value(buf, len, IIO_VAL_FRACTIONAL, 2, (int32_t*)vals);
+		ret = adis_get_temp_scale(adis, &scale_frac);
+		if (ret)
+			return ret;
+		vals[0] = scale_frac.dividend / scale_frac.divisor;
+		return iio_format_value(buf, len, IIO_VAL_INT, 2, (int32_t*)vals);
 	default:
 		return -EINVAL;
 	}
@@ -224,7 +276,7 @@ static int adis_iio_read_calibbias(void *dev, char *buf, uint32_t len,
 
 	adis = iio_adis->adis_dev;
 
-	switch (channel->ch_num) {
+	switch (channel->address) {
 	case ADIS_GYRO_X:
 		ret = adis_read_xg_bias(adis, &res);
 		break;
@@ -284,7 +336,7 @@ static int adis_iio_write_calibbias(void *dev, char *buf, uint32_t len,
 	if (ret)
 		return ret;
 
-	switch (channel->ch_num) {
+	switch (channel->address) {
 	case ADIS_GYRO_X:
 		return adis_write_xg_bias(adis, calibbias);
 	case ADIS_GYRO_Y:
@@ -563,7 +615,8 @@ static int adis_iio_write_sampling_freq(void *dev, char *buf,
  * @return the size of the written data in buf in case of success, error code
  *         otherwise.
  */
-static int adis_read_fw_date(struct adis_dev* adis, char *buf, uint8_t size)
+static int adis_iio_read_firm_date(struct adis_dev* adis, char *buf,
+				   uint8_t size)
 {
 	uint32_t firm_d;
 	uint32_t firm_m;
@@ -582,7 +635,7 @@ static int adis_read_fw_date(struct adis_dev* adis, char *buf, uint8_t size)
 	if (ret)
 		return ret;
 
-	return snprintf(buf, size, "%.2lx-%.2lx-%.4lx", firm_d, firm_m, firm_y);
+	return snprintf(buf, size, "%.2lx-%.2lx-%.4lx", firm_m, firm_d, firm_y);
 }
 
 /**
@@ -593,7 +646,8 @@ static int adis_read_fw_date(struct adis_dev* adis, char *buf, uint8_t size)
  * @return the size of the written data in buf in case of success, error code
  *         otherwise.
  */
-static int adis_read_fw_rev(struct adis_dev* adis, char *buf, uint8_t size)
+static int adis_iio_read_firm_rev(struct adis_dev* adis, char *buf,
+				  uint8_t size)
 {
 	uint32_t firm_rev;
 	int ret;
@@ -606,13 +660,34 @@ static int adis_read_fw_rev(struct adis_dev* adis, char *buf, uint8_t size)
 }
 
 /**
+ * @brief Reads the serial number and returns it in char format.
+ * @param adis - The adis device.
+ * @param buf  - The read serial number in char format.
+ * @param size - The size of buf.
+ * @return the size of the written data in buf in case of success, error code
+ *         otherwise.
+ */
+static int adis_iio_read_serial_num(struct adis_dev* adis, char *buf,
+				    uint8_t size)
+{
+	uint32_t serial_num;
+	int ret;
+
+	ret = adis_read_serial_num(adis, &serial_num);
+	if (ret)
+		return ret;
+
+	return snprintf(buf, size, "0x%.4lx", serial_num);
+}
+
+/**
  * @brief Reads gyroscope measurement range value and returns it in char format.
  * @param iio_adis - The iio adis device.
  * @param buf      - The gyroscope measurement range value in char format.
  * @return the size of the written data in buf in case of success, error code
  *         otherwise.
  */
-int iio_adis_read_gyro_meas_range(struct adis_iio_dev* iio_adis, char *buf)
+int adis_iio_read_gyro_meas_range(struct adis_iio_dev* iio_adis, char *buf)
 {
 	return snprintf(buf, 50, "%s", iio_adis->rang_mdl_txt);
 }
@@ -739,7 +814,7 @@ int adis_iio_read_debug_attrs(void *dev, char *buf, uint32_t len,
 		ret = adis_read_filt_size_var_b(adis, &res);
 		break;
 	case ADIS_GYRO_MEAS_RANGE:
-		return iio_adis_read_gyro_meas_range(iio_adis, buf);
+		return adis_iio_read_gyro_meas_range(iio_adis, buf);
 	case ADIS_DR_POLARITY:
 		ret = adis_read_dr_polarity(adis, &res);
 		break;
@@ -798,15 +873,14 @@ int adis_iio_read_debug_attrs(void *dev, char *buf, uint32_t len,
 		ret = adis_read_bias_corr_en_za(adis, &res);
 		break;
 	case ADIS_FIRM_REV:
-		return adis_read_fw_rev(adis, buf, 7);
+		return adis_iio_read_firm_rev(adis, buf, 7);
 	case ADIS_FIRM_DATE:
-		return adis_read_fw_date(adis, buf, 12);
+		return adis_iio_read_firm_date(adis, buf, 12);
 	case ADIS_PROD_ID:
 		ret = adis_read_prod_id(adis, &res);
 		break;
 	case ADIS_SERIAL_NUM:
-		ret = adis_read_serial_num(adis, &res);
-		break;
+		return adis_iio_read_serial_num(adis, buf, 7);
 	case ADIS_USR_SCR_1:
 		ret = adis_read_usr_scr_1(adis, &res);
 		break;
@@ -989,18 +1063,39 @@ int adis_iio_pre_enable(void* dev, uint32_t mask)
 
 	adis = iio_adis->adis_dev;
 
+	if (adis->info->flags & ADIS_HAS_BURST_DELTA_DATA) {
+		/* Check mask */
+		if ((mask & ADIS_BURST_DATA_SEL_0_CHN_MASK)
+		    && (mask & ADIS_BURST_DATA_SEL_1_CHN_MASK))
+			return -EINVAL;
+
+		if (mask & ADIS_BURST_DATA_SEL_1_CHN_MASK)
+			iio_adis->burst_sel = 1;
+		else
+			iio_adis->burst_sel = 0;
+		ret  = adis_write_burst_sel(adis, iio_adis->burst_sel);
+		if (ret)
+			return ret;
+	}
+
+	if (adis->info->flags & ADIS_HAS_BURST32) {
+		ret = adis_read_burst32(adis, &iio_adis->burst_size);
+		if (ret)
+			return ret;
+	} else {
+		iio_adis->burst_size = 0;
+	}
+
 	iio_adis->samples_lost = 0;
 	iio_adis->data_cntr = 0;
-	ret  = adis_read_burst_sel(adis, &iio_adis->burst_sel);
-	if (ret)
-		return ret;
-
-	ret = adis_read_burst32(adis, &iio_adis->burst_size);
-	if (ret)
-		return ret;
 
 	if (iio_adis->has_fifo) {
 		/* Set FIFO overflow behavior to overwrite old data when FIFO is full. */
+		ret = adis_cmd_fifo_flush(adis);
+		if (ret)
+			return ret;
+		/* From data-sheet, wait time to finalize the fifo flush command */
+		no_os_udelay(500);
 		ret = adis_write_fifo_overflow(adis, 1);
 		if (ret)
 			return ret;
@@ -1047,7 +1142,7 @@ int adis_iio_post_disable(void* dev, uint32_t mask)
  * @return 0 in case of success, error code otherwise.
  */
 static int adis_iio_trigger_push_single_sample(struct adis_iio_dev *iio_adis,
-		uint32_t mask, struct iio_buffer *buffer)
+		uint32_t mask, struct iio_buffer *buffer, bool pop)
 {
 	struct adis_dev *adis;
 	int ret;
@@ -1063,7 +1158,14 @@ static int adis_iio_trigger_push_single_sample(struct adis_iio_dev *iio_adis,
 
 	adis = iio_adis->adis_dev;
 
-	ret = adis_read_burst_data(adis, sizeof(buff), buff, iio_adis->burst_size);
+	ret = adis_read_burst_data(adis, sizeof(buff), buff, iio_adis->burst_size,
+				   iio_adis->burst_sel, pop);
+
+	/* If ret ==  EAGAIN then no data is available to read (will happen
+	for a burst request) */
+	if (ret == -EAGAIN)
+		return 0;
+
 	if (ret)
 		return ret;
 
@@ -1105,8 +1207,18 @@ static int adis_iio_trigger_push_single_sample(struct adis_iio_dev *iio_adis,
 		if (mask & (1 << chan)) {
 			switch(chan) {
 			case ADIS_TEMP:
-				iio_adis->data[i++] = 0;
 				iio_adis->data[i++] = buff[temp_offset];
+
+				/*
+				 * The temperature channel has 16-bit storage size.
+				 * We need to perform the padding to have the buffer
+				 * elements naturally aligned in case there are any
+				 * 32-bit storage size channels enabled which have a
+				 * scan index higher than the temperature channel scan
+				 * index.
+				 */
+				if (mask & NO_OS_GENMASK(ADIS_DELTA_VEL_Z, ADIS_DELTA_ANGL_X))
+					iio_adis->data[i++] = 0;
 				break;
 			case ADIS_GYRO_X ... ADIS_ACCEL_Z:
 				/*
@@ -1147,10 +1259,6 @@ static int adis_iio_trigger_push_single_sample(struct adis_iio_dev *iio_adis,
 					}
 				}
 				break;
-			case ADIS_DATA_COUNTER:
-				iio_adis->data[i++] = 0;
-				iio_adis->data[i++] = buff[data_cntr_offset];
-				break;
 			default:
 				break;
 			}
@@ -1178,7 +1286,7 @@ int adis_iio_trigger_handler(struct iio_device_data *dev_data)
 		return -EINVAL;
 
 	return adis_iio_trigger_push_single_sample(iio_adis,
-			dev_data->buffer->active_mask, dev_data->buffer);
+			dev_data->buffer->active_mask, dev_data->buffer, false);
 }
 
 /**
@@ -1203,21 +1311,47 @@ int adis_iio_trigger_handler_with_fifo(struct iio_device_data *dev_data)
 	if (!iio_adis->adis_dev)
 		return -EINVAL;
 
+	iio_trig_disable(iio_adis->hw_trig_desc);
+
 	adis = iio_adis->adis_dev;
 
 	ret = adis_read_fifo_cnt(adis, &fifo_cnt);
 	if (ret)
-		return ret;
+		goto trig_enable;
 
-	for (j = 0; j < fifo_cnt; j++) {
+	/* From data-sheet, minimum time between reads */
+	no_os_udelay(10);
+	if (fifo_cnt > dev_data->buffer->samples)
+		fifo_cnt = dev_data->buffer->samples;
 
+	if (fifo_cnt > 2) {
+		/* Burst request */
 		ret = adis_iio_trigger_push_single_sample(iio_adis,
-				dev_data->buffer->active_mask, dev_data->buffer);
+				dev_data->buffer->active_mask, dev_data->buffer, true);
 		if (ret)
-			return ret;
+			goto trig_enable;
+
+		/* From data-sheet, minimum time between reads */
+		no_os_udelay(10);
+
+		for (j = 0; j < fifo_cnt - 1; j++) {
+			ret = adis_iio_trigger_push_single_sample(iio_adis,
+					dev_data->buffer->active_mask, dev_data->buffer, true);
+			if (ret)
+				goto trig_enable;
+
+			/* From data-sheet, minimum time between reads */
+			no_os_udelay(10);
+		}
+		ret = adis_iio_trigger_push_single_sample(iio_adis,
+				dev_data->buffer->active_mask, dev_data->buffer, false);
+		/* From data-sheet, minimum time between reads */
+		no_os_udelay(10);
 	}
 
-	return 0;
+trig_enable:
+	iio_trig_enable(iio_adis->hw_trig_desc);
+	return ret;
 }
 
 struct iio_attribute adis_dev_attrs[] = {

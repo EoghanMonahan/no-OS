@@ -1,6 +1,5 @@
-ifeq ($(OS),Windows_NT)
-$(error STM32 builds on Windows are not currently supported.)
-else
+VSCODE_SUPPORT = yes
+
 IDE = stm32cubeide
 STM32CUBEIDE ?= $(wildcard /opt/stm32cubeide)
 ifeq ($(STM32CUBEIDE),)
@@ -18,17 +17,17 @@ $(error $(ENDL)$(ENDL)STM32CUBEMX not defined or not found at default path /opt/
 		Please run command "export STM32CUBEMX=/path/to/your/stm32cubemx"$(ENDL)\
 		Ex: export STM32CUBEMX=/opt/stm32cubemx$(ENDL)$(ENDL))
 endif # STM32CUBEMX check
-endif # OS check
 
 # Locate the compiler path under STM32CubeIDE plugins directory
 COMPILER_BIN = $(realpath $(dir $(call rwildcard, $(STM32CUBEIDE)/plugins, *arm-none-eabi-gcc)))
+COMPILER_INTELLISENSE_PATH = $(COMPILER_BIN)/arm-none-eabi-gcc
 
 # Locate openocd location under STM32CubeIDE plugins directory
 OPENOCD_SCRIPTS = $(realpath $(addsuffix ..,$(dir $(call rwildcard, $(STM32CUBEIDE)/plugins, *st_scripts/interface/stlink-dap.cfg))))
 OPENOCD_BIN = $(realpath $(dir $(call rwildcard, $(STM32CUBEIDE)/plugins, *bin/openocd)))
-
-PLATFORM_RELATIVE_PATH = $1
-PLATFORM_FULL_PATH = $1
+OPENOCD_SVD = $(word 1,$(realpath $(dir $(call rwildcard, $(STM32CUBEIDE)/plugins, *.svd))))
+VSCODE_CMSISCFG_FILE = "$(BINARY).openocd-cmsis"
+TARGET_HARDWARE=HARDWARE=$(HARDWARE)
 
 # stm32 specific build directory tree (project goes under app, but user .c/.h sources must go under app/Core)
 PROJECT_BUILDROOT = $(BUILD_DIR)/app
@@ -56,10 +55,11 @@ ITC = $(call rwildcard, $(PROJECT_BUILD)/Src,*_it.c)
 HALCONF = $(call rwildcard, $(PROJECT_BUILD)/Inc,*_hal_conf.h)
 
 ifneq (,$(wildcard $(PROJECT_BUILD)))
-TARGET = $(shell sed -rn 's|^.*(STM32[A-Z][0-9][0-9][0-9]x.)"/>$$|\1|p' $(PROJECT_BUILDROOT)/.cproject | head -n 1)
+TARGET = $(shell sed -rn 's|^.*(STM32[A-Z][0-9][0-9A-Z][0-9]x.)"/>$$|\1|p' $(PROJECT_BUILDROOT)/.cproject | head -n 1)
 CFLAGS += -D$(TARGET)
-CHIPNAME = $(shell sed -rn 's|^.*(STM32[A-Z][0-9][0-9][0-9][A-Z][A-Z][A-Z]x+)" .*$$|\1|p' $(PROJECT_BUILDROOT)/.cproject | head -n 1)
+CHIPNAME = $(shell sed -rn 's|^.*(STM32[A-Z][0-9][0-9A-Z][0-9][A-Z][A-Z][A-Z]x+)" .*$$|\1|p' $(PROJECT_BUILDROOT)/.cproject | head -n 1)
 TARGETCFG = $(shell sed -rn "s|^.*(STM32[A-Z][0-9]).*$$|target/\L\1x.cfg|p" $(PROJECT_BUILDROOT)/.cproject | head -n 1)
+TARGETSVD = $(shell sed -rn "s|^.*(STM32[A-Z][0-9][0-9A-Z][0-9]).*$$|\1|p" $(PROJECT_BUILDROOT)/.cproject | head -n 1)
 endif
 
 # Get the path of the linker script
@@ -68,9 +68,10 @@ LSCRIPT=$(wildcard $(PROJECT_BUILDROOT)/*FLASH.ld)
 # Get the extra flags that need to be added into the .cproject file
 CPROJECTFLAGS = $(sort $(subst -D,,$(filter -D%, $(CFLAGS))))
 
-$(PROJECT_TARGET):
+$(PLATFORM)_project:
 	$(call print,Creating IDE project)
-	$(MUTE) $(call mk_dir, $(BUILD_DIR))
+	$(call mk_dir, $(BUILD_DIR))
+	$(call mk_dir, $(VSCODE_CFG_DIR))
 	@echo config load $(HARDWARE) > $(BINARY).cubemx
 	@echo project name app >> $(BINARY).cubemx
 	@echo project toolchain STM32CubeIDE >> $(BINARY).cubemx
@@ -79,30 +80,35 @@ $(PROJECT_TARGET):
 	@echo SetStructure Advanced >> $(BINARY).cubemx
 	@echo project generate >> $(BINARY).cubemx
 	@echo exit >> $(BINARY).cubemx
-	$(MUTE) java -jar $(STM32CUBEMX)/$(MX) -q $(BINARY).cubemx $(HIDE)
-	$(MUTE) $(call remove_file,$(BINARY).cubemx) $(HIDE)
-	$(MUTE) $(MAKE) --no-print-directory $(PROJECT_TARGET)_configure
-	$(MUTE) $(call set_one_time_rule,$@)
+	java -jar $(STM32CUBEMX)/$(MX) -q $(BINARY).cubemx $(HIDE)
+	$(call remove_file,$(BINARY).cubemx) $(HIDE)
+	$(MAKE) --no-print-directory $(PROJECT)_configure
 
-$(PROJECT_TARGET)_configure:
+$(PROJECT)_configure:
 	$(call print,Configuring project)
-	$(MUTE) sed -i 's/ main(/ stm32_init(/' $(PROJECT_BUILD)/Src/main.c $(HIDE)
-	$(MUTE) sed -i '0,/while (1)/s//return 0;/' $(PROJECT_BUILD)/Src/main.c $(HIDE)
-	$(MUTE) sed -i 's/USE_HAL_TIM_REGISTER_CALLBACKS\s*0U/USE_HAL_TIM_REGISTER_CALLBACKS\t1U/g' $(HALCONF) $(HIDE)
-	$(MUTE) sed -i 's/USE_HAL_UART_REGISTER_CALLBACKS\s*0U/USE_HAL_UART_REGISTER_CALLBACKS\t1U/g' $(HALCONF) $(HIDE)
-	$(MUTE) $(call copy_file, $(PROJECT_BUILD)/Src/main.c, $(PROJECT_BUILD)/Src/generated_main.c) $(HIDE)
-	$(MUTE) $(call remove_file, $(PROJECT_BUILD)/Src/main.c) $(HIDE)
+	sed -i 's/ main(/ stm32_init(/' $(PROJECT_BUILD)/Src/main.c $(HIDE)
+	sed -i '0,/while (1)/s//return 0;/' $(PROJECT_BUILD)/Src/main.c $(HIDE)
+	sed -i 's/USE_HAL_TIM_REGISTER_CALLBACKS\s*0U/USE_HAL_TIM_REGISTER_CALLBACKS\t1U/g' $(HALCONF) $(HIDE)
+	sed -i 's/USE_HAL_UART_REGISTER_CALLBACKS\s*0U/USE_HAL_UART_REGISTER_CALLBACKS\t1U/g' $(HALCONF) $(HIDE)
+	$(call copy_file, $(PROJECT_BUILD)/Src/main.c, $(PROJECT_BUILD)/Src/generated_main.c) $(HIDE)
+	$(call remove_file, $(PROJECT_BUILD)/Src/main.c) $(HIDE)
 
-	$(MUTE) $(call remove_file, $(PROJECT_BUILD)/Src/syscalls.c) $(HIDE)
+	$(call remove_file, $(PROJECT_BUILD)/Src/syscalls.c) $(HIDE)
 
-	$(MUTE) $(foreach inc, $(EXTRA_INC_PATHS), sed -i '/Core\/Inc"\/>/a <listOptionValue builtIn="false" value="$(inc)"\/>' $(PROJECT_BUILDROOT)/.cproject;) $(HIDE)
-	$(MUTE) $(foreach flag, $(CPROJECTFLAGS), sed -i '/USE_HAL_DRIVER"\/>/a <listOptionValue builtIn="false" value="$(flag)"\/>' $(PROJECT_BUILDROOT)/.cproject;) $(HIDE)
-	$(MUTE) $(STM32CUBEIDE)/$(IDE) -nosplash -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
+	$(foreach inc, $(EXTRA_INC_PATHS), sed -i '/Core\/Inc"\/>/a <listOptionValue builtIn="false" value="$(inc)"\/>' $(PROJECT_BUILDROOT)/.cproject;) $(HIDE)
+	$(foreach flag, $(CPROJECTFLAGS), sed -i '/USE_HAL_DRIVER"\/>/a <listOptionValue builtIn="false" value="$(flag)"\/>' $(PROJECT_BUILDROOT)/.cproject;) $(HIDE)
+	$(STM32CUBEIDE)/$(IDE) -nosplash -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
 		-import $(PROJECT_BUILDROOT) -data $(BUILD_DIR) \
 		$(HIDE)
-	$(MUTE) sed -i  's/HAL_NVIC_EnableIRQ(\EXTI/\/\/ HAL_NVIC_EnableIRQ\(EXTI/' $(PROJECT_BUILD)/Src/generated_main.c $(HIDE)
-	$(shell python3 $(PLATFORM_TOOLS)/exti_script.py $(ASM_SRCS) $(EXTI_GEN_FILE))
-	$(MUTE) $(call copy_file, $(EXTI_GEN_FILE), $(PROJECT_BUILD)/Src/stm32_gpio_irq_generated.c) $(HIDE)
+	sed -i  's/HAL_NVIC_EnableIRQ(\EXTI/\/\/ HAL_NVIC_EnableIRQ\(EXTI/' $(PROJECT_BUILD)/Src/generated_main.c $(HIDE)
+	$(shell python $(PLATFORM_TOOLS)/exti_script.py $(ASM_SRCS) $(EXTI_GEN_FILE))
+	$(call copy_file, $(EXTI_GEN_FILE), $(PROJECT_BUILD)/Src/stm32_gpio_irq_generated.c) $(HIDE)
+	$(file > $(CPP_PROP_JSON),$(CPP_FINAL_CONTENT))
+	$(file > $(SETTINGSJSON),$(VSC_SET_CONTENT))
+	$(file > $(LAUNCHJSON),$(VSC_LAUNCH_CONTENT))
+	$(file > $(TASKSJSON),$(VSC_TASKS_CONTENT))
+	$(MAKE) $(BINARY).openocd-cmsis
+	$(MAKE) $(BINARY).openocd
 
 $(PLATFORM)_sdkopen:
 	$(STM32CUBEIDE)/$(IDE) -nosplash -import $(PROJECT_BUILDROOT) -data $(BUILD_DIR) &
@@ -135,7 +141,22 @@ AR = arm-none-eabi-ar
 AS = arm-none-eabi-gcc
 CC = arm-none-eabi-gcc
 GDB = arm-none-eabi-gdb
+GDB_PORT = 50000
 OC = arm-none-eabi-objcopy
+SIZE = arm-none-eabi-size
+
+ifeq (,$(COMPILER_BIN))
+COMPILER_BIN = $(realpath $(dir $(call rwildcard, $(STM32CUBEIDE)/plugins, *arm-none-eabi-gcc)))
+endif
+export PATH := $(COMPILER_BIN):$(PATH)
+
+.PHONY: $(BINARY).openocd-cmsis
+$(BINARY).openocd-cmsis:
+	@echo source [find interface/cmsis-dap.cfg] > $(BINARY).openocd-cmsis
+	@echo transport select swd >> $(BINARY).openocd-cmsis
+	@echo gdb_port $(GDB_PORT) >> $(BINARY).openocd-cmsis
+	@echo reset_config srst_only >> $(BINARY).openocd-cmsis
+	@echo source [find $(TARGETCFG)] >> $(BINARY).openocd-cmsis
 
 .PHONY: $(BINARY).openocd
 $(BINARY).openocd:
@@ -150,12 +171,12 @@ $(BINARY).openocd:
 	@echo set CONNECT_UNDER_RESET 1 >> $(BINARY).openocd
 	@echo set CORE_RESET 0 >> $(BINARY).openocd
 	@echo set AP_NUM 0 >> $(BINARY).openocd
-	@echo set GDB_PORT 3333 >> $(BINARY).openocd
+	@echo gdb_port $(GDB_PORT) >> $(BINARY).openocd
 	@echo source [find $(TARGETCFG)] >> $(BINARY).openocd
 
 .PHONY: $(BINARY).gdb
 $(BINARY).gdb:
-	@echo target remote localhost:3333 > $(BINARY).gdb
+	@echo target remote localhost:$(GDB_PORT) > $(BINARY).gdb
 	@echo load $(BINARY) >> $(BINARY).gdb
 	@echo file $(BINARY) >> $(BINARY).gdb
 	@echo monitor reset halt >> $(BINARY).gdb
@@ -167,27 +188,27 @@ $(BINARY).gdb:
 HEX = $(basename $(BINARY)).hex
 
 $(HEX): $(BINARY)
-	$(MUTE) $(call print,[HEX] $(notdir $@))
-	$(MUTE) $(OC) -O ihex $(BINARY) $(HEX)
-	$(MUTE) $(call print,$(notdir $@) is ready)
+	$(call print,[HEX] $(notdir $@))
+	$(OC) -O ihex $(BINARY) $(HEX)
+	$(call print,$(notdir $@) is ready)
 
-post_build: $(HEX)
+$(PLATFORM)_post_build: $(HEX)
 
 PHONY += $(PLATFORM)_sdkbuild
 $(PLATFORM)_sdkbuild:
-	$(MUTE) $(STM32CUBEIDE)/$(IDE) -nosplash -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
+	$(STM32CUBEIDE)/$(IDE) -nosplash -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
 		-import $(PROJECT_BUILDROOT) -data $(BUILD_DIR) -build app $(HIDE)
 
 PHONY += $(PLATFORM)_sdkclean
 $(PLATFORM)_sdkclean:
 	$(call print,[Delete] SDK artefacts from $(DEBUG_DIR))
-	$(MUTE) $(call remove_dir,$(DEBUG_DIR)) $(HIDE)
+	$(call remove_dir,$(DEBUG_DIR)) $(HIDE)
 	$(call print,[Delete] SDK artefacts from $(RELEASE_DIR))
-	$(MUTE) $(call remove_dir,$(RELEASE_DIR)) $(HIDE)
+	$(call remove_dir,$(RELEASE_DIR)) $(HIDE)
 
 clean_hex:
 	@$(call print,[Delete] $(HEX))
-	$(MUTE) $(call remove_file,$(HEX)) $(HIDE)
+	$(call remove_file,$(HEX)) $(HIDE)
 
 clean: clean_hex
 

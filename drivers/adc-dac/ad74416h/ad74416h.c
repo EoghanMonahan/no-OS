@@ -67,7 +67,9 @@ static const unsigned int ad74416h_debounce_map[AD74416H_DIN_DEBOUNCE_LEN] = {
 };
 
 /** The ADC conversion rates */
-static const uint32_t conv_rate_ad74416h[] = { 10, 20, 1200, 4800, 9600, 200 };
+static const uint32_t conv_rate_ad74416h[] = {
+	10, 20, 1200, 4800, 9600, 19200, 200,
+};
 
 /******************************************************************************/
 /************************ Functions Definitions *******************************/
@@ -190,7 +192,7 @@ int ad74416h_reg_read_raw(struct ad74416h_desc *desc, uint32_t addr,
 
 	/* Make sure that NOP sequence is written for the second frame */
 	ad74416h_format_reg_write(desc->dev_addr, AD74416H_NOP, AD74416H_NOP,
-						val);
+				  val);
 
 	return no_os_spi_write_and_read(desc->spi_desc, val, AD74416H_FRAME_SIZE);
 }
@@ -295,16 +297,22 @@ int ad74416h_get_raw_adc_result(struct ad74416h_desc *desc, uint32_t ch,
 	uint32_t val_msb, val_lsb;
 	int ret;
 
-	ret = ad74416h_reg_read(desc, AD74416H_ADC_RESULT_UPR(ch), val_msb);
-	if (ret)
-		return ret;
+	if (desc->id == ID_AD74416H) {
+		ret = ad74416h_reg_read(desc, AD74416H_ADC_RESULT_UPR(ch),
+					&val_msb);
+		if (ret)
+			return ret;
+	}
 
 	ret = ad74416h_reg_read(desc, AD74416H_ADC_RESULT(ch), &val_lsb);
 	if (ret)
 		return ret;
 
-	*val = (no_os_field_get(AD74416H_CONV_RES_UPR_MSK, val_msb) << 16) |
-	       no_os_field_get(AD74416H_CONV_RESULT_MSK, val_lsb);
+	if (desc->id == ID_AD74416H)
+		*val = (no_os_field_get(AD74416H_CONV_RES_UPR_MSK, val_msb) << 16) |
+		       no_os_field_get(AD74416H_CONV_RESULT_MSK, val_lsb);
+	else
+		*val = no_os_field_get(AD74416H_CONV_RESULT_MSK, val_lsb);
 
 	return 0;
 }
@@ -376,6 +384,18 @@ int ad74416h_get_adc_range(struct ad74416h_desc *desc, uint32_t ch,
 int ad74416h_set_adc_range(struct ad74416h_desc *desc, uint32_t ch,
 			   enum ad74416h_adc_range val)
 {
+	if (desc->id == ID_AD74414H) {
+		switch(val) {
+		case AD74416H_RNG_NEG12_12_V:
+		case AD74416H_RNG_0_0P625V:
+		case AD74416H_RNG_NEG104_104MV:
+		case AD74416H_RNG_NEG2P5_2P5V:
+			return -EINVAL;
+		default:
+			break;
+		}
+	}
+
 	return ad74416h_reg_update(desc, AD74416H_ADC_CONFIG(ch),
 				   AD74416H_ADC_CONV_RANGE_MSK, val);
 }
@@ -446,6 +466,16 @@ int ad74416h_get_adc_conv_mux(struct ad74416h_desc *desc, uint32_t ch,
 int ad74416h_set_adc_conv_mux(struct ad74416h_desc *desc, uint32_t ch,
 			      enum ad74416h_adc_conv_mux val)
 {
+	if (desc->id == ID_AD74414H) {
+		switch(val) {
+		case AD74416H_MUX_VSENSEN_TO_AGND:
+		case AD74416H_MUX_LF_TO_VSENSEN:
+			return -EINVAL;
+		default:
+			break;
+		}
+	}
+
 	return ad74416h_reg_update(desc, AD74416H_ADC_CONFIG(ch),
 				   AD74416H_CONV_MUX_MSK, val);
 }
@@ -555,6 +585,17 @@ int ad74416h_set_channel_function(struct ad74416h_desc *desc,
 	int ret;
 	uint16_t dac_code;
 
+	if (desc->id == ID_AD74414H) {
+		switch(ch_func) {
+		case AD74416H_VOLTAGE_OUT:
+		case AD74416H_VOLTAGE_IN:
+		case AD74416H_RESISTANCE:
+			return -EINVAL;
+		default:
+			break;
+		}
+	}
+
 	ret = ad74416h_reg_update(desc, AD74416H_CH_FUNC_SETUP(ch),
 				  AD74416H_CH_FUNC_SETUP_MSK, AD74416H_HIGH_Z);
 	if (ret)
@@ -652,6 +693,16 @@ int ad74416h_set_channel_dac_code(struct ad74416h_desc *desc, uint32_t ch,
 int ad74416h_set_diag(struct ad74416h_desc *desc, uint32_t ch,
 		      enum ad74416h_diag_mode diag_code)
 {
+	if (desc->id == ID_AD74414H) {
+		switch(diag_code) {
+		case AD74416H_DIAG_LVIN:
+		case AD74416H_VSENSEN_C:
+			return -EINVAL;
+		default:
+			break;
+		}
+	}
+
 	return ad74416h_reg_update(desc, AD74416H_DIAG_ASSIGN,
 				   AD74416H_DIAG_ASSIGN_MSK(ch), diag_code);
 }
@@ -789,7 +840,8 @@ int ad74416h_set_threshold(struct ad74416h_desc *desc, uint32_t ch,
  */
 int ad74416h_do_set(struct ad74416h_desc *desc, uint32_t ch, uint8_t val)
 {
-	return ad74416h_reg_update(desc, AD74416H_DO_EXT_CONFIG(ch), AD74416H_DO_DATA_MSK, val);
+	return ad74416h_reg_update(desc, AD74416H_DO_EXT_CONFIG(ch),
+				   AD74416H_DO_DATA_MSK, val);
 }
 
 /**
@@ -907,7 +959,8 @@ int ad74416h_reset(struct ad74416h_desc *desc)
 	}
 	/* Time taken for device reset (datasheet value = 1ms) */
 	no_os_mdelay(1);
-	return ret;
+
+	return 0;
 }
 
 /**

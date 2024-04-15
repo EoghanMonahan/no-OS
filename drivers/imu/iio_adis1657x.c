@@ -49,57 +49,6 @@
 /************************** Variable Definitions ******************************/
 /******************************************************************************/
 
-/* Values from datasheet for 32-bit data */
-static const struct adis_iio_scale_fractional adis1657x_gyro_scale[] = {
-	[ADIS16575_2] = {1, RAD_TO_DEGREE(2621440)},
-	[ADIS16575_3] = {1, RAD_TO_DEGREE(655360)},
-	[ADIS16576_2] = {1, RAD_TO_DEGREE(2621440)},
-	[ADIS16576_3] = {1, RAD_TO_DEGREE(655360)},
-	[ADIS16577_2] = {1, RAD_TO_DEGREE(2621440)},
-	[ADIS16577_3] = {1, RAD_TO_DEGREE(655360)},
-};
-
-static const struct adis_iio_scale_fractional adis1657x_accl_scale[] = {
-	/* datasheet scale is in LSB/g = 262144000, need to convert to m/s^2 262144000/9.80665 = 26731249 */
-	[ADIS16575_2] = {1, 26731249},
-	[ADIS16575_3] = {1, 26731249},
-	/* datasheet scale is in LSB/g = 52428800, need to convert to m/s^2 52428800/9.80665 = 5346250 */
-	[ADIS16576_2] = {1, 5346250},
-	[ADIS16576_3] = {1, 5346250},
-	/* datasheet scale is in LSB/g = 52428800, need to convert to m/s^2 52428800/9.80665 = 5346250 */
-	[ADIS16577_2] = {1, 5346250},
-	[ADIS16577_3] = {1, 5346250},
-};
-
-static const struct adis_iio_scale_fractional_log2 adis1657x_rot_scale[] = {
-	[ADIS16575_2] = {450, 31},
-	[ADIS16575_3] = {2000, 31},
-	[ADIS16576_2] = {450, 31},
-	[ADIS16576_3] = {2000, 31},
-	[ADIS16577_2] = {450, 31},
-	[ADIS16577_3] = {2000, 31},
-};
-
-static const struct adis_iio_scale_fractional_log2 adis1657x_vel_scale[] = {
-	[ADIS16575_2] = {100, 31},
-	[ADIS16575_3] = {100, 31},
-	[ADIS16576_2] = {100, 31},
-	[ADIS16576_3] = {100, 31},
-	[ADIS16577_2] = {100, 31},
-	[ADIS16577_3] = {100, 31},
-};
-
-/* IIO uses milli-degrees Celsius for temperature */
-static const struct adis_iio_scale_fractional adis1657x_temp_scale[] = {
-
-	[ADIS16575_2] = {1 * MILLIDEGREE_PER_DEGREE, 10},
-	[ADIS16575_3] = {1 * MILLIDEGREE_PER_DEGREE, 10},
-	[ADIS16576_2] = {1 * MILLIDEGREE_PER_DEGREE, 10},
-	[ADIS16576_3] = {1 * MILLIDEGREE_PER_DEGREE, 10},
-	[ADIS16577_2] = {1 * MILLIDEGREE_PER_DEGREE, 10},
-	[ADIS16577_3] = {1 * MILLIDEGREE_PER_DEGREE, 10},
-};
-
 static const char * const adis1657x_rang_mdl_txt[] = {
 	[ADIS16575_2] = "+/-450_degrees_per_sec",
 	[ADIS16575_3] = "+/-2000_degrees_per_sec",
@@ -143,16 +92,8 @@ static struct scan_type adis1657x_iio_delta_angl_scan_type = {
 
 static struct scan_type adis1657x_iio_temp_scan_type = {
 	.sign 		= 's',
-	.realbits 	= 32,
-	.storagebits 	= 32,
-	.shift 		= 0,
-	.is_big_endian 	= true
-};
-
-static struct scan_type adis1657x_iio_data_counter_scan_type = {
-	.sign 		= 'u',
-	.realbits 	= 32,
-	.storagebits 	= 32,
+	.realbits 	= 16,
+	.storagebits 	= 16,
 	.shift 		= 0,
 	.is_big_endian 	= true
 };
@@ -171,7 +112,6 @@ static struct iio_channel adis1657x_channels[] = {
 	ADIS_DELTA_VEL_CHAN	(X, 	ADIS_DELTA_VEL_X, 	1657x),
 	ADIS_DELTA_VEL_CHAN	(Y, 	ADIS_DELTA_VEL_Y, 	1657x),
 	ADIS_DELTA_VEL_CHAN	(Z, 	ADIS_DELTA_VEL_Z, 	1657x),
-	ADIS_DATA_COUNTER_CHAN	(ADIS_DATA_COUNTER,		1657x),
 };
 
 struct iio_attribute adis1657x_debug_attrs[] = {
@@ -514,7 +454,7 @@ struct iio_attribute adis1657x_debug_attrs[] = {
 		.priv = ADIS_USR_SCR_3,
 	},
 	{
-		.name = "flash_counter",
+		.name = "flash_count",
 		.show = adis_iio_read_debug_attrs,
 		.priv = ADIS_FLS_MEM_WR_CNTR,
 	},
@@ -535,6 +475,8 @@ static struct iio_device adis1657x_iio_dev = {
 	.pre_enable 		= (int32_t (*)())adis_iio_pre_enable,
 	.post_disable 		= (int32_t (*)())adis_iio_post_disable,
 	.trigger_handler 	= (int32_t (*)())adis_iio_trigger_handler_with_fifo,
+	.debug_reg_read 	= (int32_t (*)())adis_iio_read_reg,
+	.debug_reg_write 	= (int32_t (*)())adis_iio_write_reg,
 };
 
 /******************************************************************************/
@@ -545,10 +487,12 @@ static struct iio_device adis1657x_iio_dev = {
  * @brief Initialize adis1657x iio device.
  * @param iio_dev    - The adis1657x iio device.
  * @param init_param - The structure that contains the device initial parameters.
+ * @param adis1657x_trig_desc - Trigger descriptor for data ready pin.
  * @return 0 in case of success, error code otherwise.
  */
 int adis1657x_iio_init(struct adis_iio_dev **iio_dev,
-		       struct adis_init_param *init_param)
+		       struct adis_init_param *init_param,
+		       struct iio_hw_trig *adis1657x_trig_desc)
 {
 	int ret;
 	struct adis_iio_dev *desc;
@@ -559,18 +503,12 @@ int adis1657x_iio_init(struct adis_iio_dev **iio_dev,
 
 	desc->iio_dev = &adis1657x_iio_dev;
 
-	adis1657x_chip_info.ip = init_param;
-
-	/* Update scales based on the device id */
-	desc->gyro_scale = adis1657x_gyro_scale[init_param->dev_id];
-	desc->accl_scale = adis1657x_accl_scale[init_param->dev_id];
-	desc->rot_scale = adis1657x_rot_scale[init_param->dev_id];
-	desc->vel_scale = adis1657x_vel_scale[init_param->dev_id];
-	desc->temp_scale = adis1657x_temp_scale[init_param->dev_id];
+	/* Update data based on the device id */
 	desc->rang_mdl_txt = adis1657x_rang_mdl_txt[init_param->dev_id];
 	desc->has_fifo = true;
+	desc->hw_trig_desc = adis1657x_trig_desc;
 
-	ret = adis_init(&desc->adis_dev, &adis1657x_chip_info);
+	ret = adis_init(&desc->adis_dev, init_param);
 	if (ret)
 		goto error_adis1657x_init;
 
