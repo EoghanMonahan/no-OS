@@ -1182,7 +1182,7 @@ void HART_Read_Single_byte_config(struct ad74416h_desc *desc)
    
     ad74416h_reg_write(desc, AD74416H_HART_CONFIG(0), 0xF031);          //enable hart modem
     
-    Wait_us(1000);
+    no_os_udelay(1000);
     ad74416h_reg_write(desc, AD74416H_HART_FCR(0), 0x000F);
 
     ad74416h_reg_write(desc, AD74416H_ALERT_STATUS, 0xFFFF);
