@@ -1192,7 +1192,7 @@ void HART_Read_Single_byte_config(struct ad74416h_desc *desc)
 
 uint16_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t *hart_data_rx)
 {
-    if(HART_ALERTb_Status()==0)
+    if(HART_ALERTb_Status(desc)==0)
     { 
         if (HART_RxFIFO_ByteCount(desc)==1)
         {
@@ -1210,7 +1210,7 @@ uint16_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t *hart_data_r
     }  
 }
 
-uint8_t HART_ALERTb_Status()
+uint8_t HART_ALERTb_Status(struct ad74416h_desc *desc)
 {
 	uint8_t alert_status=0;
     ad74416h_reg_read(desc, AD74416H_HART_RFC(0), &alert_status);
