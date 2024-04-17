@@ -810,6 +810,7 @@ void HART_ReadHartFrame(struct ad74416h_desc *, uint16_t* hart_data_tx);
 
 void HART_Read_Single_byte_config(struct ad74416h_desc *);
 uint16_t HART_Read_Single_byte(struct ad74416h_desc *, uint16_t* hart_data_rx);
+uint8_t HART_ALERTb_Status(struct ad74416h_desc *);
 
 
 #endif // _AD74416H_H
