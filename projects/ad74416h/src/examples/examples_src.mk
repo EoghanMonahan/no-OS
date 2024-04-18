@@ -82,5 +82,11 @@ SRCS += $(PROJECT)/src/examples/voltage_input_irq/voltage_input_irq.c
 INCS += $(PROJECT)/src/examples/voltage_input_irq/voltage_input_irq.h
 endif
 
+ifeq (y,$(strip $(HART_EXAMPLE)))
+CFLAGS += -DHART_EXAMPLE=1
+SRCS += $(PROJECT)/src/examples/hart/hart.c
+INCS += $(PROJECT)/src/examples/hart/hart.h
+endif
+
 INCS += $(INCLUDE)/no_os_list.h \
 	$(PLATFORM_DRIVERS)/$(PLATFORM)_uart.h
