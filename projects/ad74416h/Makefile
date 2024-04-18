@@ -1,5 +1,5 @@
 # Select the example you want to enable by choosing y for enabling and n for disabling
-BASIC_EXAMPLE = y
+BASIC_EXAMPLE = n
 HART_EXAMPLE = y
 # Select the device you want to enable by choosing y for enabling and n for disabling
 include ../../tools/scripts/generic_variables.mk
