@@ -77,7 +77,23 @@ int main()
 
 #endif
 
-#if (BASIC_EXAMPLE == 0)
+#ifdef HART_EXAMPLE
+	struct no_os_uart_desc *uart_desc;
+
+	ret = no_os_uart_init(&uart_desc, &ad74416h_uart_ip);
+	if (ret)
+		return ret;
+
+	no_os_uart_stdio(uart_desc);
+	ret = hart_example_main();
+	if (ret) {
+		no_os_uart_remove(uart_desc);
+		return ret;
+	}
+
+#endif
+
+#if (BASIC_EXAMPLE == 0 & HART_EXAMPLE == 0)
 #error At least one example has to be selected using y value in Makefile.
 #endif
 
