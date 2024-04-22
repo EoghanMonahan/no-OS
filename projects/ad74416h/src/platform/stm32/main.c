@@ -48,6 +48,10 @@
 #include "basic_example.h"
 #endif
 
+#ifdef HART_EXAMPLE
+#include "hart.h"
+#endif
+
 /***************************************************************************//**
  * @brief Main function execution for STM32 platform.
  *
