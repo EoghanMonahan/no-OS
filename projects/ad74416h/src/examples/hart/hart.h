@@ -46,6 +46,13 @@
 /******************************************************************************/
 /************************ Functions Declarations ******************************/
 /******************************************************************************/
+#define HART_STATE_IDLE   0
+#define HART_STATE_RX     1
+#define HART_STATE_ACK    2
+#define HART_STATE_RTS    3
+#define HART_STATE_TX     4
+#define HART_STATE_OFF    5
+extern char cHartState;
 int hart_example_main();
 
 #endif /* __HART_EXAMPLE_H__ */

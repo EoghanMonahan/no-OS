@@ -56,6 +56,9 @@
  * @return ret - Result of the example execution. If working correctly, will
  *               execute continuously the while(1) loop and will not return.
 *******************************************************************************/
+
+char cHartState = HART_STATE_TX;      // State machine switch
+
 int hart_example_main()
 {
 	struct ad74416h_desc *ad74416h_desc;
@@ -74,6 +77,44 @@ int hart_example_main()
 	}
 
 	pr_info("ad74416h GPO2 set to HIGH\r\n");
+
+	while(1) {
+		switch (cHartState)
+		{
+		// ----------------------------------------------------------------------
+		// Wait for HART Carrier Detected. 
+		// When active, switch UART from J3 to HART modem (and start receiving)
+		// ----------------------------------------------------------------------
+		case HART_STATE_IDLE:   // Wait for carrier detect 
+			if (HART_ALERTb_Status(desc))   // Carrier detected ?
+			{
+	//        GPIO_LedOn();
+			cHartState = HART_STATE_TX;
+			} // if .. Carrier detected
+		break;  // HART_STATE_IDLE
+
+		// ----------------------------------------------------------------------
+		// When Carrier Detect stops, generate response message
+		// ----------------------------------------------------------------------
+		case HART_STATE_RX:     // Wait for carrier stop
+			uint16_t hart_data_rx = 0;
+
+			HART_ReadHartFrame(desc, hart_data_rx);
+			cHartState = HART_STATE_IDLE; 
+		break;  // HART_STATE_RX
+
+		case HART_STATE_TX:
+			uint16_t hart_data_tx = 11111
+
+			HART_SendHartfame(desc, hart_data_tx, sizeof(hart_data_tx));
+
+			cHartState = HART_STATE_RX; 
+		break; // HART_STATE_TX
+
+		} // switch (cHartState)
+
+
+	}
 
 	return 0;
 
