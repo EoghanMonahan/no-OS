@@ -63,7 +63,8 @@ int hart_example_main()
 {
 	struct ad74416h_desc *ad74416h_desc;
 	int ret;
-
+	uint16_t hart_data_tx;
+	uint16_t hart_data_rx;
 	ret = ad74416h_init(&ad74416h_desc, &ad74416h_ip);
 	if (ret)
 		goto error;
@@ -97,14 +98,14 @@ int hart_example_main()
 		// When Carrier Detect stops, generate response message
 		// ----------------------------------------------------------------------
 		case HART_STATE_RX:     // Wait for carrier stop
-			uint16_t hart_data_rx;
+			
 			hart_data_rx = 0;
 			HART_ReadHartFrame(&ad74416h_desc, hart_data_rx);
 			cHartState = HART_STATE_IDLE; 
 		break;  // HART_STATE_RX
 
 		case HART_STATE_TX:
-			uint16_t hart_data_tx;
+
 			hart_data_tx = 11111;
 			HART_SendHartfame(&ad74416h_desc, hart_data_tx, sizeof(hart_data_tx));
 
