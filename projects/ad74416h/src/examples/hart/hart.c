@@ -101,8 +101,9 @@ int hart_example_main()
 			hart_data_rx = 0;
 			HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
 			cHartState = HART_STATE_IDLE; 
-			output[0] = hart_data_rx & 0xFF;
-			output[1] = hart_data_rx >> 8;
+			// output[0] = hart_data_rx & 0xFF;
+			// output[1] = hart_data_rx >> 8;
+			sprintf(output, "%d", hart_data_rx);
 			pr_info(output);
 		break;  // HART_STATE_RX
 
