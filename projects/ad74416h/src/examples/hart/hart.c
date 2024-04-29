@@ -87,21 +87,20 @@ int hart_example_main()
 		// When active, switch UART from J3 to HART modem (and start receiving)
 		// ----------------------------------------------------------------------
 		case HART_STATE_IDLE:   // Wait for carrier detect 
-			if (HART_ALERTb_Status(ad74416h_desc))   // Carrier detected ?
+			if (HART_ALERTb_Status(ad74416h_desc))   // 
 			{
-	//        GPIO_LedOn();
-			cHartState = HART_STATE_TX;
-			} // if .. Carrier detected
+			cHartState = HART_STATE_RX;
+			} // 
 		break;  // HART_STATE_IDLE
 
 		// ----------------------------------------------------------------------
 		// When Carrier Detect stops, generate response message
 		// ----------------------------------------------------------------------
-		case HART_STATE_RX:     // Wait for carrier stop
-			
+		case HART_STATE_RX: 
 			hart_data_rx = 0;
 			HART_ReadHartFrame(&ad74416h_desc, hart_data_rx);
 			cHartState = HART_STATE_IDLE; 
+			pr_info(hart_data_rx);
 		break;  // HART_STATE_RX
 
 		case HART_STATE_TX:
@@ -109,7 +108,7 @@ int hart_example_main()
 			hart_data_tx = 11111;
 			HART_SendHartfame(&ad74416h_desc, hart_data_tx, sizeof(hart_data_tx));
 
-			cHartState = HART_STATE_RX; 
+			cHartState = HART_STATE_IDLE; 
 		break; // HART_STATE_TX
 
 		} // switch (cHartState)
