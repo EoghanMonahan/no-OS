@@ -65,7 +65,7 @@ int hart_example_main()
 	int ret;
 	uint16_t hart_data_tx;
 	uint16_t hart_data_rx;
-	char output[2];
+	char output_buffer[10];
 	ret = ad74416h_init(&ad74416h_desc, &ad74416h_ip);
 	if (ret)
 		goto error;
@@ -103,8 +103,8 @@ int hart_example_main()
 			cHartState = HART_STATE_IDLE; 
 			// output[0] = hart_data_rx & 0xFF;
 			// output[1] = hart_data_rx >> 8;
-			sprintf(output, "%d", hart_data_rx);
-			pr_info(output);
+			sprintf(output_buffer, "%d", hart_data_rx);
+			pr_info(output_buffer);
 		break;  // HART_STATE_RX
 
 		case HART_STATE_TX:
