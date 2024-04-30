@@ -94,9 +94,7 @@ int hart_example_main()
 			} // 
 		break;  // HART_STATE_IDLE
 
-		// ----------------------------------------------------------------------
-		// When Carrier Detect stops, generate response message
-		// ----------------------------------------------------------------------
+
 		case HART_STATE_RX: 
 			hart_data_rx = 0;
 			HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
@@ -104,7 +102,7 @@ int hart_example_main()
 			// output[0] = hart_data_rx & 0xFF;
 			// output[1] = hart_data_rx >> 8;
 			sprintf(output_buffer, "%d", hart_data_rx);
-			pr_info("Recieved");
+			pr_info(output_buffer);
 		break;  // HART_STATE_RX
 
 		case HART_STATE_TX:
@@ -114,7 +112,7 @@ int hart_example_main()
 
 			cHartState = HART_STATE_IDLE; 
 		break; // HART_STATE_TX
-
+		no_os_udelay(10000);
 		} // switch (cHartState)
 
 
