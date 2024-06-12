@@ -82,6 +82,7 @@ int hart_example_main()
 
 	while(1) {
 		switch (cHartState)
+		no_os_udelay(10000);
 		{
 		// ----------------------------------------------------------------------
 		// Wait for HART Carrier Detected. 
@@ -112,7 +113,6 @@ int hart_example_main()
 
 			cHartState = HART_STATE_IDLE; 
 		break; // HART_STATE_TX
-		no_os_udelay(10000);
 		} // switch (cHartState)
 
 
