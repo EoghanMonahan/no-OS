@@ -82,7 +82,6 @@ int hart_example_main()
 
 	while(1) {
 		switch (cHartState)
-		no_os_udelay(10000);
 		{
 		// ----------------------------------------------------------------------
 		// Wait for HART Carrier Detected. 
@@ -93,6 +92,7 @@ int hart_example_main()
 			{
 			cHartState = HART_STATE_RX;
 			} // 
+			no_os_udelay(10000);
 		break;  // HART_STATE_IDLE
 
 
@@ -104,6 +104,7 @@ int hart_example_main()
 			// output[1] = hart_data_rx >> 8;
 			sprintf(output_buffer, "%d", hart_data_rx);
 			pr_info(output_buffer);
+			no_os_udelay(10000);
 		break;  // HART_STATE_RX
 
 		case HART_STATE_TX:
@@ -112,6 +113,7 @@ int hart_example_main()
 			HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
 
 			cHartState = HART_STATE_IDLE; 
+			no_os_udelay(10000);
 		break; // HART_STATE_TX
 		} // switch (cHartState)
 
