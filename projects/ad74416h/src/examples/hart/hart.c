@@ -80,6 +80,13 @@ int hart_example_main()
 
 	pr_info("ad74416h GPO2 set to HIGH\r\n");
 
+	ret = HART_Configure(ad74416h_desc);
+	if (ret) {
+		pr_info("Error configuring HART C\r\n");
+		goto error_ad74416h;
+	}
+	pr_info("HART configured\r\n");
+
 	while(1) {
 		switch (cHartState)
 		{

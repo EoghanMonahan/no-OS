@@ -1074,20 +1074,37 @@ int ad74416h_remove(struct ad74416h_desc *desc)
 	return 0;
 }
 
-void HART_Configure(struct ad74416h_desc *desc)
+int HART_Configure(struct ad74416h_desc *desc)
 {
-    
-    ad74416h_reg_write(desc, AD74416H_CH_FUNC_SETUP(0), 0x0000);          
-    ad74416h_reg_write(desc, AD74416H_CH_FUNC_SETUP(0), 0x000C);          //Iin Loop powered with HART Mode
+    int ret;
+    ret = ad74416h_reg_write(desc, AD74416H_CH_FUNC_SETUP(0), 0x0000); 
+	if (ret)
+		return ret;
 
-    ad74416h_reg_write(desc, AD74416H_OUTPUT_CONFIG(0), 0x0140);
-    
-    ad74416h_reg_write(desc, AD74416H_ADC_CONV_CTRL, 0x0000);
-    ad74416h_reg_write(desc, AD74416H_ADC_CONV_CTRL, 0x2001);
+    ret =ad74416h_reg_write(desc, AD74416H_CH_FUNC_SETUP(0), 0x000C);          //Iin Loop powered with HART Mode
+	if (ret)
+		return ret;
+
+    ret = ad74416h_reg_write(desc, AD74416H_OUTPUT_CONFIG(0), 0x0140);
+    if (ret)
+		return ret;
+
+    ret = ad74416h_reg_write(desc, AD74416H_ADC_CONV_CTRL, 0x0000);
+	if (ret)
+		return ret;
+    ret = ad74416h_reg_write(desc, AD74416H_ADC_CONV_CTRL, 0x2001);
+	if (ret)
+		return ret;
       
-    ad74416h_reg_write(desc, AD74416H_HART_ALERT_MASK(0), 0x0000);
+    ret = ad74416h_reg_write(desc, AD74416H_HART_ALERT_MASK(0), 0x0000);
+	if (ret)
+		return ret;
 
-    ad74416h_reg_write(desc, AD74416H_HART_CONFIG(0), 0xD431);
+    ret = ad74416h_reg_write(desc, AD74416H_HART_CONFIG(0), 0xD431);
+	if (ret)
+		return ret;
+
+	return 0;
 
 }
 

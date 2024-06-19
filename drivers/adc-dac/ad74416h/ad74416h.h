@@ -796,7 +796,7 @@ int ad74416h_init(struct ad74416h_desc **, struct ad74416h_init_param *);
 int ad74416h_remove(struct ad74416h_desc *desc);
 
 
-void HART_Configure(struct ad74416h_desc *);
+int HART_Configure(struct ad74416h_desc *);
 
 void HART_enableRTS(struct ad74416h_desc *);
 void HART_disableRTS(struct ad74416h_desc *);
