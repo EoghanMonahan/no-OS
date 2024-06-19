@@ -101,7 +101,7 @@ int hart_example_main()
 			{
 				cHartState = HART_STATE_RX;
 			} // 
-			pr_info(ret);
+			sprintf(ret);
 			no_os_udelay(10000);
 		break;  // HART_STATE_IDLE
 
@@ -131,7 +131,6 @@ int hart_example_main()
 			no_os_udelay(10000);
 		break; // HART_STATE_TX
 		} // switch (cHartState)
-		pr_info("Transmitting data\r\n");
 
 	}
 
