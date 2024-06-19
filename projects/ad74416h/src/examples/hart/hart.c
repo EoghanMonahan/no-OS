@@ -96,7 +96,7 @@ int hart_example_main()
 		// ----------------------------------------------------------------------
 		case HART_STATE_IDLE:   // Wait for carrier detect 
 			pr_info("Idling\r\n");
-			ret = HART_ALERTb_Status(ad74416h_desc)
+			ret = HART_ALERTb_Status(ad74416h_desc);
 			if (ret)   // 
 			{
 				cHartState = HART_STATE_RX;
