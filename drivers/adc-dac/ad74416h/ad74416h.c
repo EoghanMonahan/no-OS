@@ -1111,28 +1111,37 @@ int HART_Configure(struct ad74416h_desc *desc)
 
 
 
-void HART_enableRTS(struct ad74416h_desc *desc)
+int HART_enableRTS(struct ad74416h_desc *desc)
 {
+    int ret;
+    ret = ad74416h_reg_write(desc, AD74416H_HART_MCR(0),0x0001);
+	if (ret)
+		return ret;
     
-    ad74416h_reg_write(desc, AD74416H_HART_MCR(0),0x0001);
-    
+	return 0;
 }
 
 
-void HART_disableRTS(struct ad74416h_desc *desc)
+int HART_disableRTS(struct ad74416h_desc *desc)
 {
-  
-    ad74416h_reg_write(desc, AD74416H_HART_MCR(0),0x0000);
-       
+	int ret;
+    ret = ad74416h_reg_write(desc, AD74416H_HART_MCR(0),0x0000);
+    if (ret)
+		return ret;  
+
+	return 0; 
 }
 
-void HART_WriteTxData(struct ad74416h_desc *desc, uint16_t* hart_data_tx, uint16_t totallen)
+int HART_WriteTxData(struct ad74416h_desc *desc, uint16_t* hart_data_tx, uint16_t totallen)
 {
-       
+       int ret;
        for(int i=0;i< totallen;i++)
        {
-              ad74416h_reg_write(desc, AD74416H_HART_TX(0),hart_data_tx[i]);
+              ret = ad74416h_reg_write(desc, AD74416H_HART_TX(0),hart_data_tx[i]);
+			  if (ret)
+					return ret;
        }
+	   return 0;
        
     
 }
@@ -1159,19 +1168,29 @@ uint8_t HART_RxFIFO_ByteCount(struct ad74416h_desc *desc)
     return totallen;
 }
 
-void HART_SendHartfame(struct ad74416h_desc *desc, uint16_t* hart_data_tx, uint8_t totallen)
+int HART_SendHartfame(struct ad74416h_desc *desc, uint16_t* hart_data_tx, uint8_t totallen)
 {
+	int ret;
     if (totallen <= 32)
     {
-        HART_WriteTxData(desc, hart_data_tx, totallen);
-        HART_enableRTS(desc);
+        ret = HART_WriteTxData(desc, hart_data_tx, totallen);
+		if (ret)
+			return ret;
+        ret = HART_enableRTS(desc);
+		if (ret)
+			return ret;
     }
     else
     {   
-        HART_WriteTxData(desc, hart_data_tx, 32);
-        HART_enableRTS(desc);
+        ret = HART_WriteTxData(desc, hart_data_tx, 32);
+		if (ret)
+			return ret;
+        ret = HART_enableRTS(desc);
+		if (ret)
+			return ret;
 
     }
+	return 0;
 
 }
 

@@ -118,8 +118,11 @@ int hart_example_main()
 
 			hart_data_tx = 11111;
 			pr_info("Transmitting data\r\n");
-			HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
-			HART_enableRTS(ad74416h_desc);
+			ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
+			if (ret) {
+				pr_info("Error transmitting HART data C\r\n");
+				goto error_ad74416h;
+			}
 
 			cHartState = HART_STATE_IDLE; 
 			no_os_udelay(10000);

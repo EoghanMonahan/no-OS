@@ -800,12 +800,12 @@ int HART_Configure(struct ad74416h_desc *);
 
 void HART_enableRTS(struct ad74416h_desc *);
 void HART_disableRTS(struct ad74416h_desc *);
-void HART_WriteTxData(struct ad74416h_desc *, uint16_t* hart_data_tx, uint16_t totallen);
+int HART_WriteTxData(struct ad74416h_desc *, uint16_t* hart_data_tx, uint16_t totallen);
 void HART_ReadRxData(struct ad74416h_desc *, uint16_t* hart_data_rx, uint16_t totallen); 
 uint8_t HART_TxFIFO_ByteCount(struct ad74416h_desc *);
 uint8_t HART_RxFIFO_ByteCount(struct ad74416h_desc *);
 
-void HART_SendHartfame(struct ad74416h_desc *, uint16_t* hart_data_tx, uint8_t totallen);
+int HART_SendHartfame(struct ad74416h_desc *, uint16_t* hart_data_tx, uint8_t totallen);
 void HART_ReadHartFrame(struct ad74416h_desc *, uint16_t* hart_data_tx);
 
 void HART_Read_Single_byte_config(struct ad74416h_desc *);
