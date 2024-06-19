@@ -117,7 +117,9 @@ int hart_example_main()
 		case HART_STATE_TX:
 
 			hart_data_tx = 11111;
+			pr_info("Transmitting data\r\n");
 			HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
+			HART_enableRTS(ad74416h_desc);
 
 			cHartState = HART_STATE_IDLE; 
 			no_os_udelay(10000);
