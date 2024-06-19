@@ -97,7 +97,7 @@ int hart_example_main()
 		case HART_STATE_IDLE:   // Wait for carrier detect 
 			if (HART_ALERTb_Status(ad74416h_desc))   // 
 			{
-			cHartState = HART_STATE_RX;
+				cHartState = HART_STATE_RX;
 			} // 
 			no_os_udelay(10000);
 		break;  // HART_STATE_IDLE

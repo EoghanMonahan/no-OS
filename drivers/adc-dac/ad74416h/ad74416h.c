@@ -1249,6 +1249,6 @@ uint16_t HART_Read_Single_byte(struct ad74416h_desc *desc, uint16_t *hart_data_r
 uint16_t HART_ALERTb_Status(struct ad74416h_desc *desc)
 {
 	uint16_t alert_status=0;
-    ad74416h_reg_read(desc, AD74416H_HART_ALERT_STATUS(0), &alert_status);
+    ad74416h_reg_read(desc, AD74416H_HART_ALERT_STATUS(8), &alert_status);
 	return alert_status;
 }
