@@ -96,7 +96,6 @@ int hart_example_main()
 		// When active, switch UART from J3 to HART modem (and start receiving)
 		// ----------------------------------------------------------------------
 		case HART_STATE_IDLE:   // Wait for carrier detect 
-			pr_info("Idling\r\n");
 			ret = HART_ALERTb_Status(ad74416h_desc);
 			if (ret)   // 
 			{
@@ -107,7 +106,7 @@ int hart_example_main()
 				pr_info("Error reading HART alert status C\r\n");
 				goto error_ad74416h;
 			}
-			pr_info(result);
+			pr_info("%d\r\n", result);
 			no_os_udelay(10000);
 		break;  // HART_STATE_IDLE
 
