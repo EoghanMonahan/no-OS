@@ -101,7 +101,7 @@ int hart_example_main()
 			{
 				cHartState = HART_STATE_RX;
 			} // 
-			sprintf(ret);
+			printf(ret);
 			no_os_udelay(10000);
 		break;  // HART_STATE_IDLE
 
