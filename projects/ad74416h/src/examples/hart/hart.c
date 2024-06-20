@@ -65,7 +65,7 @@ int hart_example_main()
 	int ret;
 	uint16_t hart_data_tx;
 	uint16_t hart_data_rx;
-	uint8_t result;
+	uint16_t result;
 	char output_buffer[10];
 	ret = ad74416h_init(&ad74416h_desc, &ad74416h_ip);
 	if (ret)
