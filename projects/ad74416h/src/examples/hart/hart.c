@@ -101,7 +101,7 @@ int hart_example_main()
 			{
 				cHartState = HART_STATE_RX;
 			} // 
-			ret = ad74416h_reg_read_raw(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
+			ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
 			if (ret) {
 				pr_info("Error reading HART alert status C\r\n");
 				goto error_ad74416h;
