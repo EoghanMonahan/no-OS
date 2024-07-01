@@ -89,59 +89,59 @@ int hart_example_main()
 	pr_info("HART configured\r\n");
 
 	while(1) {
-		switch (cHartState)
-		{
-		// ----------------------------------------------------------------------
-		// Wait for HART Carrier Detected. 
-		// When active, switch UART from J3 to HART modem (and start receiving)
-		// ----------------------------------------------------------------------
-		// case HART_STATE_IDLE:   // Wait for carrier detect 
-		// 	ret = HART_ALERTb_Status(ad74416h_desc);
-		// 	if (ret)   // 
-		// 	{
-		// 		cHartState = HART_STATE_RX;
-		// 	} // 
-		// 	ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
-		// 	if (ret) {
-		// 		pr_info("Error reading HART alert status C\r\n");
-		// 		goto error_ad74416h;
-		// 	}
-		// 	pr_info("%d\r\n", result);
-		// 	no_os_udelay(10000);
-		// break;  // HART_STATE_IDLE
+	// 	switch (cHartState)
+	// 	{
+	// 	// ----------------------------------------------------------------------
+	// 	// Wait for HART Carrier Detected. 
+	// 	// When active, switch UART from J3 to HART modem (and start receiving)
+	// 	// ----------------------------------------------------------------------
+	// 	// case HART_STATE_IDLE:   // Wait for carrier detect 
+	// 	// 	ret = HART_ALERTb_Status(ad74416h_desc);
+	// 	// 	if (ret)   // 
+	// 	// 	{
+	// 	// 		cHartState = HART_STATE_RX;
+	// 	// 	} // 
+	// 	// 	ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
+	// 	// 	if (ret) {
+	// 	// 		pr_info("Error reading HART alert status C\r\n");
+	// 	// 		goto error_ad74416h;
+	// 	// 	}
+	// 	// 	pr_info("%d\r\n", result);
+	// 	// 	no_os_udelay(10000);
+	// 	// break;  // HART_STATE_IDLE
 
 
-		// case HART_STATE_RX: 
-		// 	hart_data_rx = 0;
-		// 	HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
-		// 	cHartState = HART_STATE_IDLE; 
-		// 	// output[0] = hart_data_rx & 0xFF;
-		// 	// output[1] = hart_data_rx >> 8;
-		// 	sprintf(output_buffer, "%d", hart_data_rx);
-		// 	pr_info(output_buffer);
-		// 	no_os_udelay(10000);
-		// break;  // HART_STATE_RX
+	// 	// case HART_STATE_RX: 
+	// 	// 	hart_data_rx = 0;
+	// 	// 	HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
+	// 	// 	cHartState = HART_STATE_IDLE; 
+	// 	// 	// output[0] = hart_data_rx & 0xFF;
+	// 	// 	// output[1] = hart_data_rx >> 8;
+	// 	// 	sprintf(output_buffer, "%d", hart_data_rx);
+	// 	// 	pr_info(output_buffer);
+	// 	// 	no_os_udelay(10000);
+	// 	// break;  // HART_STATE_RX
 
-		// case HART_STATE_TX:
+	// 	// case HART_STATE_TX:
 
-		// 	hart_data_tx = 11111;
-		// 	pr_info("Transmitting data\r\n");
-		// 	ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
-		// 	if (ret) {
-		// 		pr_info("Error transmitting HART data C\r\n");
-		// 		goto error_ad74416h;
-		// 	}
+	// 	// 	hart_data_tx = 11111;
+	// 	// 	pr_info("Transmitting data\r\n");
+	// 	// 	ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
+	// 	// 	if (ret) {
+	// 	// 		pr_info("Error transmitting HART data C\r\n");
+	// 	// 		goto error_ad74416h;
+	// 	// 	}
 
-		// 	cHartState = HART_STATE_IDLE; 
-		// 	no_os_udelay(10000);
-		// break; // HART_STATE_TX
-		// } // switch (cHartState)
-
+	// 	// 	cHartState = HART_STATE_IDLE; 
+	// 	// 	no_os_udelay(10000);
+	// 	// break; // HART_STATE_TX
+	// 	// } // switch (cHartState)
 		hart_data_rx = 0;
 		HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
 		pr_info("%d", hart_data_rx);
 
 	}
+	
 
 	return 0;
 
