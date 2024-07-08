@@ -88,6 +88,14 @@ int hart_example_main()
 	}
 	pr_info("HART configured\r\n");
 
+	pr_info("Transmitting data\r\n");
+	ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
+	if (ret) {
+		pr_info("Error transmitting HART data C\r\n");
+		goto error_ad74416h;
+	}
+		
+
 	while(1) {
 		// switch (cHartState)
 		// {
@@ -139,13 +147,7 @@ int hart_example_main()
 		hart_data_rx = 0;
 		HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
 		pr_info("%d", hart_data_rx);
-		// hart_data_tx = 11111;
-		// pr_info("Transmitting data\r\n");
-		// ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
-		// if (ret) {
-		// 	pr_info("Error transmitting HART data C\r\n");
-		// 	goto error_ad74416h;
-		// }
+		hart_data_tx = "d";
 		
 	}
 	
