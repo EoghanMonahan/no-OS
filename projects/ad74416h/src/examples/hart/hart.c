@@ -108,6 +108,7 @@ int hart_example_main()
 				goto error_ad74416h;
 			}
 			pr_info("%d\r\n", result);
+			no_os_mdelay(10000);
 		break;  // HART_STATE_IDLE
 
 
