@@ -87,13 +87,6 @@ int hart_example_main()
 		goto error_ad74416h;
 	}
 	pr_info("HART configured\r\n");
-
-	pr_info("Transmitting data\r\n");
-	ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
-	if (ret) {
-		pr_info("Error transmitting HART data C\r\n");
-		goto error_ad74416h;
-	}
 		
 
 	while(1) {
@@ -105,8 +98,9 @@ int hart_example_main()
 		// ----------------------------------------------------------------------
 		case HART_STATE_IDLE:   // Wait for carrier detect 
 			ret = HART_ALERTb_Status(ad74416h_desc);
+			pr_info("%d", ret);
 			if (ret) {
-				cHartState = HART_STATE_RX;
+				//cHartState = HART_STATE_RX;
 			} // 
 			ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
 			if (ret) {
@@ -132,7 +126,7 @@ int hart_example_main()
 
 		case HART_STATE_TX:
 
-			hart_data_tx = 'd' - '0';
+			hart_data_tx = 'd';
 			pr_info("Transmitting data\r\n");
 			ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
 			if (ret) {
