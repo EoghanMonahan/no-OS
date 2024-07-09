@@ -99,14 +99,13 @@ int hart_example_main()
 	while(1) {
 		switch (cHartState)
 		{
-		----------------------------------------------------------------------
-		Wait for HART Carrier Detected. 
-		When active, switch UART from J3 to HART modem (and start receiving)
-		----------------------------------------------------------------------
+		// ----------------------------------------------------------------------
+		// Wait for HART Carrier Detected. 
+		// When active, switch UART from J3 to HART modem (and start receiving)
+		// ----------------------------------------------------------------------
 		case HART_STATE_IDLE:   // Wait for carrier detect 
 			ret = HART_ALERTb_Status(ad74416h_desc);
-			if (ret)   // 
-			{
+			if (ret) {
 				cHartState = HART_STATE_RX;
 			} // 
 			ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
@@ -133,7 +132,7 @@ int hart_example_main()
 
 		case HART_STATE_TX:
 
-			hart_data_tx = "d";
+			hart_data_tx = 'd' - '0';
 			pr_info("Transmitting data\r\n");
 			ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
 			if (ret) {
