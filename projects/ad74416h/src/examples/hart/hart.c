@@ -66,6 +66,7 @@ int hart_example_main()
 	uint16_t hart_data_tx;
 	uint16_t hart_data_rx;
 	uint16_t result;
+	uint16_t status;
 	char output_buffer[10];
 	ret = ad74416h_init(&ad74416h_desc, &ad74416h_ip);
 	if (ret)
@@ -97,9 +98,9 @@ int hart_example_main()
 		// When active, switch UART from J3 to HART modem (and start receiving)
 		// ----------------------------------------------------------------------
 		case HART_STATE_IDLE:   // Wait for carrier detect 
-			ret = HART_ALERTb_Status(ad74416h_desc);
-			pr_info("%d", ret);
-			if (ret) {
+			status = HART_ALERTb_Status(ad74416h_desc);
+			pr_info("%d", status);
+			if (status != 0) {
 				//cHartState = HART_STATE_RX;
 			} // 
 			ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
