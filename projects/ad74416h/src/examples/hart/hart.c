@@ -101,7 +101,7 @@ int hart_example_main()
 			status = HART_ALERTb_Status(ad74416h_desc);
 			pr_info("%d", status);
 			if (status != 0) {
-				//cHartState = HART_STATE_RX;
+				cHartState = HART_STATE_RX;
 			} // 
 			ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
 			if (ret) {
@@ -109,7 +109,6 @@ int hart_example_main()
 				goto error_ad74416h;
 			}
 			pr_info("%d\r\n", result);
-			no_os_mdelay(10000);
 		break;  // HART_STATE_IDLE
 
 
