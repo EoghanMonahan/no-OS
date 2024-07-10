@@ -67,7 +67,7 @@ int hart_example_main()
 	uint16_t hart_data_rx;
 	uint16_t result;
 	uint16_t status;
-	char output_buffer[10];
+	char output_buffer[50];
 	ret = ad74416h_init(&ad74416h_desc, &ad74416h_ip);
 	if (ret)
 		goto error;
@@ -145,7 +145,6 @@ int hart_example_main()
 		// output[1] = hart_data_rx >> 8;
 		sprintf(output_buffer, "%d", hart_data_rx);
 		pr_info(output_buffer);
-		pr_info("%d", hart_data_rx);
 		
 		
 	}
