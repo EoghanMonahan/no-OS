@@ -90,7 +90,7 @@ int hart_example_main()
 	pr_info("HART configured\r\n");
 		
 
-	// while(1) {
+	while(1) {
 	// 	switch (cHartState)
 	// 	{
 	// 	// ----------------------------------------------------------------------
@@ -148,7 +148,7 @@ int hart_example_main()
 		pr_info("%d", hart_data_rx);
 		
 		
-	// }
+	}
 	
 
 	return 0;
