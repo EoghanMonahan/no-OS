@@ -144,7 +144,7 @@ int hart_example_main()
 		// output[0] = hart_data_rx & 0xFF;
 		// output[1] = hart_data_rx >> 8;
 		sprintf(output_buffer, "%d", hart_data_rx);
-		pr_info(output_buffer);
+		//pr_info(output_buffer);
 		
 		
 	}

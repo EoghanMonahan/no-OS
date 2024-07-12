@@ -1254,5 +1254,6 @@ uint16_t HART_ALERTb_Status(struct ad74416h_desc *desc)
 	if ((alert_status && AD74416H_HART_ALERT_D_MSK) != 0) {
 		ad74416h_reg_read(desc, AD74416H_HART_ALERT_STATUS(8), &hart_alert_status);
 	}
+	printf(hart_alert_status);
 	return hart_alert_status;
 }
