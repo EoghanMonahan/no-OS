@@ -90,61 +90,61 @@ int hart_example_main()
 	pr_info("HART configured\r\n");
 		
 
-	while(1) {
-		switch (cHartState)
-		{
-		// ----------------------------------------------------------------------
-		// Wait for HART Carrier Detected. 
-		// When active, switch UART from J3 to HART modem (and start receiving)
-		// ----------------------------------------------------------------------
-		case HART_STATE_IDLE:   // Wait for carrier detect 
-		status = HART_ALERTb_Status(ad74416h_desc);
-			pr_info("%d", status);
-			if (status != 0) {
-				cHartState = HART_STATE_RX;
-			} // 
-			ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
-			if (ret) {
-				pr_info("Error reading HART alert status C\r\n");
-				goto error_ad74416h;
-			}
-			pr_info("%d\r\n", result);
-		break;  // HART_STATE_IDLE
+	// while(1) {
+	// 	switch (cHartState)
+	// 	{
+	// 	// ----------------------------------------------------------------------
+	// 	// Wait for HART Carrier Detected. 
+	// 	// When active, switch UART from J3 to HART modem (and start receiving)
+	// 	// ----------------------------------------------------------------------
+	// 	case HART_STATE_IDLE:   // Wait for carrier detect 
+	// 	status = HART_ALERTb_Status(ad74416h_desc);
+	// 		pr_info("%d", status);
+	// 		if (status != 0) {
+	// 			cHartState = HART_STATE_RX;
+	// 		} // 
+	// 		ret = ad74416h_reg_read(ad74416h_desc, AD74416H_HART_ALERT_STATUS(8), &result);
+	// 		if (ret) {
+	// 			pr_info("Error reading HART alert status C\r\n");
+	// 			goto error_ad74416h;
+	// 		}
+	// 		pr_info("%d\r\n", result);
+	// 	break;  // HART_STATE_IDLE
 
 
-		case HART_STATE_RX: 
-			hart_data_rx = 0;
-			HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
-			cHartState = HART_STATE_IDLE; 
-			// output[0] = hart_data_rx & 0xFF;
-			// output[1] = hart_data_rx >> 8;
-			sprintf(output_buffer, "%d", hart_data_rx);
-			pr_info(output_buffer);
-			pr_info("%d", hart_data_rx);
+	// 	case HART_STATE_RX: 
+	// 		hart_data_rx = 0;
+	// 		HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
+	// 		cHartState = HART_STATE_IDLE; 
+	// 		// output[0] = hart_data_rx & 0xFF;
+	// 		// output[1] = hart_data_rx >> 8;
+	// 		sprintf(output_buffer, "%d", hart_data_rx);
+	// 		pr_info(output_buffer);
+	// 		pr_info("%d", hart_data_rx);
 			
 			
-		break;  // HART_STATE_RX
+	// 	break;  // HART_STATE_RX
 
-		case HART_STATE_TX:
+	// 	case HART_STATE_TX:
 
-			hart_data_tx = 'd';
-			pr_info("Transmitting data\r\n");
-			ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
-			if (ret) {
-				pr_info("Error transmitting HART data C\r\n");
-				goto error_ad74416h;
-			}
+	// 		hart_data_tx = 'd';
+	// 		pr_info("Transmitting data\r\n");
+	// 		ret = HART_SendHartfame(ad74416h_desc, &hart_data_tx, sizeof(hart_data_tx));
+	// 		if (ret) {
+	// 			pr_info("Error transmitting HART data C\r\n");
+	// 			goto error_ad74416h;
+	// 		}
 
-			cHartState = HART_STATE_IDLE; 
-		break; // HART_STATE_TX
-		} // switch (cHartState)
-		// hart_data_rx = 0;
-		// HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
-		// cHartState = HART_STATE_IDLE; 
-		// // output[0] = hart_data_rx & 0xFF;
-		// // output[1] = hart_data_rx >> 8;
-		// sprintf(output_buffer, "%d", hart_data_rx);
-		//pr_info(output_buffer);
+	// 		cHartState = HART_STATE_IDLE; 
+	// 	break; // HART_STATE_TX
+	// 	} // switch (cHartState)
+		hart_data_rx = 0;
+		HART_ReadHartFrame(ad74416h_desc, &hart_data_rx);
+		cHartState = HART_STATE_IDLE; 
+		// output[0] = hart_data_rx & 0xFF;
+		// output[1] = hart_data_rx >> 8;
+		sprintf(output_buffer, "%d", hart_data_rx);
+		pr_info(output_buffer);
 		
 		
 	}
