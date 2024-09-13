@@ -67,6 +67,7 @@ int hart_example_main()
 	uint16_t hart_data_rx;
 	uint16_t result;
 	uint16_t status;
+	uint16_t len = 40;
 	char output_buffer[50];
 	ret = ad74416h_init(&ad74416h_desc, &ad74416h_ip);
 	if (ret)
@@ -89,7 +90,7 @@ int hart_example_main()
 	}
 	pr_info("HART configured\r\n");
 		
-	HART_SendHartFrame(ad74416h_desc, &hart_data_tx, uint16_t 40);
+	HART_SendHartFrame(ad74416h_desc, &hart_data_tx, len);
 
 	while(1) {
 	// 	switch (cHartState)
