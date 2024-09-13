@@ -63,7 +63,7 @@ int hart_example_main()
 {
 	struct ad74416h_desc *ad74416h_desc;
 	int ret;
-	uint16_t hart_data_tx;
+	uint16_t hart_data_tx = 0x0281000083;
 	uint16_t hart_data_rx;
 	uint16_t result;
 	uint16_t status;
@@ -89,6 +89,7 @@ int hart_example_main()
 	}
 	pr_info("HART configured\r\n");
 		
+	HART_SendHartFrame(ad74416h_desc, &hart_data_tx, 40);
 
 	while(1) {
 	// 	switch (cHartState)
