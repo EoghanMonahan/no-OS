@@ -89,7 +89,7 @@ int hart_example_main()
 	}
 	pr_info("HART configured\r\n");
 		
-	HART_SendHartFrame(ad74416h_desc, &hart_data_tx, 40);
+	HART_SendHartFrame(ad74416h_desc, &hart_data_tx, uint16_t 40);
 
 	while(1) {
 	// 	switch (cHartState)
